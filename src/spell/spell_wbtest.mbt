@@ -14,17 +14,22 @@ fn case_name(kind : CaseKind) -> String {
 
 ///|
 test "classify_case covers every shape" {
-  assert_eq(case_name(classify_case("hello")), "lower")
-  assert_eq(case_name(classify_case("café")), "lower")
-  assert_eq(case_name(classify_case("Hello")), "capitalized")
-  assert_eq(case_name(classify_case("HELLO")), "allcaps")
-  assert_eq(case_name(classify_case("A")), "allcaps")
-  assert_eq(case_name(classify_case("iPhone")), "mixed")
-  assert_eq(case_name(classify_case("ABc")), "mixed")
-  assert_eq(case_name(classify_case("cAt")), "mixed")
-  assert_eq(case_name(classify_case("123")), "none")
-  assert_eq(case_name(classify_case("--")), "none")
-  assert_eq(case_name(classify_case("")), "none")
+  assert_eq(case_name(classify_case("hello", false)), "lower")
+  assert_eq(case_name(classify_case("café", false)), "lower")
+  assert_eq(case_name(classify_case("Hello", false)), "capitalized")
+  assert_eq(case_name(classify_case("HELLO", false)), "allcaps")
+  assert_eq(case_name(classify_case("A", false)), "allcaps")
+  assert_eq(case_name(classify_case("iPhone", false)), "mixed")
+  assert_eq(case_name(classify_case("ABc", false)), "mixed")
+  assert_eq(case_name(classify_case("cAt", false)), "mixed")
+  assert_eq(case_name(classify_case("123", false)), "none")
+  assert_eq(case_name(classify_case("--", false)), "none")
+  assert_eq(case_name(classify_case("", false)), "none")
+  // Under CHECKSHARPS `ß` is a lower-case letter, so an otherwise uppercase
+  // word containing it is mixed case and may only match exactly.
+  assert_eq(case_name(classify_case("MÜßIG", true)), "mixed")
+  assert_eq(case_name(classify_case("MÜSSIG", true)), "allcaps")
+  assert_eq(case_name(classify_case("Müßig", true)), "capitalized")
 }
 
 ///|

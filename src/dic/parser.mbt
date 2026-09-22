@@ -174,7 +174,11 @@ fn split_word_flags(field : String) -> (String, String?) {
 ///   because it cannot form a flag.
 /// * `Num`: comma-separated decimal numbers, kept verbatim as strings; empty
 ///   fields between commas are skipped.
-fn decode_flags(raw : String, flag_type : @aff.FlagType) -> Array[String] {
+///
+/// This is also how the continuation flags after the `/` of an affix rule's
+/// `add` field are decoded (`SFX A 0 s/123 .`), so it is part of the package
+/// interface rather than a private helper.
+pub fn decode_flags(raw : String, flag_type : @aff.FlagType) -> Array[String] {
   match flag_type {
     @aff.SingleChar | @aff.Utf8 => {
       let flags : Array[String] = []

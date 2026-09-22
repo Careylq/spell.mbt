@@ -7,6 +7,8 @@ import {
 }
 
 // Values
+pub fn decode_flags(String, @aff.FlagType) -> Array[String]
+
 pub fn parse_dic(String, @aff.FlagType) -> DicFile raise DicParseError
 
 // Errors

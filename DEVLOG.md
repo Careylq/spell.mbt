@@ -210,4 +210,103 @@ moon run examples/basic   → 正常运行并打印可人工核对的判定表
 
 ---
 
+## 2026-09-22 · Day 4 — 符合率攻坚：54.1% → 84.7%
+
+**背景**
+- 起点的实测数字（真实跑完整语料，154 个套件）：
+
+```
+.good  : 459/848 = 54.1%     .wrong : 570/613 = 93.0%
+```
+
+- 本轮的目标只有一个：把 `.good` 拉上去，**同时不许把 `.wrong` 拉下来**（硬约束：不低于 570）。
+  每改一处都重跑 `bash conformance/run.sh`，下面的数字全部来自真实运行。
+
+**逐个特性的前后对比（都是整语料实测）**
+
+| 特性 | `.good` | `.wrong` | 备注 |
+|---|---|---|---|
+| 起点 | 459/848 | 570/613 | |
+| `IGNORE` 字符 | 483/848 | 570/613 | ignore/ignoresug/ignoreutf/right_to_left_mark 全过 |
+| `FLAG UTF-8` 编码 bug | 504/848 | 570/613 | flagutf8 2/8 → 4/8；详见下节 |
+| `CHECKSHARPS` | 504/848 | 570/613 | checksharps 13/13、checksharpsutf 13/13、checksharpsutf2 12/12（+19） |
+| `COMPOUNDRULE` | 624/848 | 570/613 | compoundrule 0/2→2/2，2 0/37→37/37，5 0/7→7/7，7/8 9/29→29/29（+120） |
+| 词缀延续标志（二重后缀）+ `AF` 向量 + 派生形 `NEEDAFFIX`/`ONLYINCOMPOUND` | 660/848 | **579**/613 | alias/flag 系列全过，`.wrong` 反而净增 9 |
+| 同形异义词（homonym）+ 数字 + `BREAK` | 712/848 | 579/613 | needaffix2/4 1/4→4/4，i53643 0/21→21/21，break 4/12→12/12 |
+| 两段式 `COMPOUNDBEGIN`/`COMPOUNDEND` | **718/848 (84.7%)** | **579/613 (94.5%)** | 2999225 1/2→2/2，opentaal_keepcase 0/4→4/4 |
+
+**找到的真 bug：`flagutf8` 不是 `FLAG UTF-8` 的解析问题，是 CLI 的编码嗅探**
+
+- 现象：`flagutf8` 只有 2/8。该 `.aff` **没有 `SET` 行**，但声明了 `FLAG UTF-8`，
+  且 flag 是 `ö`/`ü`/`Ü` 这样的多字节字符。
+- CLI 的 `sniff_encoding` 在没有 `SET` 时按 Hunspell 默认回落到 Latin-1，于是
+  `Ü`（UTF-8 的 `C3 9C`）被解成两个 Latin-1 字符。
+- 关键的不一致：`.aff` 解析器把规则 flag 原样存成**一个两字符串**
+  `"Ã\u{9C}"`，而 `.dic` 的 `decode_flags`（`FLAG UTF-8`）按**字符**切分，得到
+  两个单字符 flag `["Ã", "\u{9C}"]`。两边永远不相等 → `unfoo`/`unfoos` 判错。
+- 修法：`sniff_encoding` 在没有 `SET` 时也识别 `FLAG UTF-8`，认定为 UTF-8
+  （一个 flag 就是一个 Unicode 字符，只能是 UTF-8）。这是**语义性 bug**，
+  编译器不会报，只有语料能抓出来。
+- 剩下的 4 个词（`foosbar` 等）当时确实缺"延续标志"特性，不是 bug；本轮后续补上了，
+  现在 `flagutf8` 是 8/8。
+
+**最惊险的一次：`.wrong` 一度掉到 560**
+
+- 实现二重后缀后 `.good` 涨到 660，但 `.wrong` 从 570 掉到 **560**：
+  `germancompounding` / `germancompoundingold` 各多认了 5 个错词
+  （`computer`、`computern`、`arbeit`、`Arbeits`、`arbeits`）。
+- 定位：`computer` 被 `PFX D C c/PX C`（德语去大写前缀）+
+  `SFX B 0 0/VWXDP .`（空后缀）拼出来。`PFX D` 的 flag `D` 不在词根上，
+  而是由那条后缀的**延续标志** `VWXDP` 提供的，所以旧的检查放行了。
+- 根因：**延续标志里的 `ONLYINCOMPOUND`/`NEEDAFFIX` 也必须生效**。
+  `Arbeits` = `Arbeit` + `SFX A 0 s/UPX .`，`X` 是 `ONLYINCOMPOUND`，
+  所以 `Arbeits` 只能在复合词里出现，单独出现必须判错。
+- 修法：新增 `derived_standalone(rules)`——按施加顺序模拟状态机：
+  `ONLYINCOMPOUND` 一旦出现在任一延续类里就永不允许单独成词；
+  `NEEDAFFIX` 是一个"待满足"状态，被下一个词缀满足（但最后一个词缀若又给出
+  `NEEDAFFIX` 则仍不成词）。`prefoopseudosuf` 这类词还要求搜索**施加顺序**，
+  因为前缀可以先加、后加或夹在中间。
+- 结果：`.wrong` 不只恢复，还从 570 涨到 **579**（`needaffix5` 3/3、
+  `onlyincompound2/3`、`fogemorpheme` 之前各漏 1 个）。
+- **教训**：增加"接受路径"必然增加误收；`.wrong` 必须每次重测，不能只看 `.good`。
+
+**这次没做、也没假装做的**
+
+- **德语复合词**（`germancompounding` 还剩 16、`germancompoundingold` 还剩 10）：
+  需要 `COMPOUNDMIDDLE`、复合词内部的**带词缀部件**、`COMPOUNDPERMITFLAG`、
+  `CHECKCOMPOUNDCASE`，以及德语"复合词里的名词自动小写化"这条从语料看不完全清楚的规则
+  （`.aff` 里没有 `LANG de_DE`）。这是本轮最大的剩余缺口，但风险高（那两个套件共 100 个
+  `.wrong`），决定不半成品上线。
+- `COMPLEXPREFIXES`（`alias3` 差 1）、`ICONV`/`OCONV`（`iconv*`/`oconv*`）、
+  `COMPOUNDWORDMAX`/`COMPOUNDSYLLABLE`（`hu` 差 7）、
+  `CHECKCOMPOUNDPATTERN`（`opentaal_cpdpat*`、`checkcompoundpattern5`）。
+- 建议生成 `suggest()`（`.sug` 语料）仍然整体在范围外。
+
+**一个测量工具本身的缺陷（没有去改它）**
+
+- `conformance/run.sh` 用 `paste -d' ' <(grep . good) <(verdicts)` 配对，
+  于是**本身含空格的语料行会错位**。`morph.good` 有 16 行是 `drink eat` 这种。
+- 库现在把这种行按"空白分隔的一组词，每个都对才算对"处理，16 行全部判对；
+  但 harness 只能统计到 10/26（正好是 10 个单词）。
+- 选择**不改 harness**：一改，本轮数字就和题目给的基线不可比了。
+  这里只如实记录：`morph` 的可测上限是 10/26。
+
+**AI 使用方式（本日）**
+- 仍然是"AI 打字、编译器判定"：每改一处就 `moon check` + `moon test`，
+  每个特性做完立刻跑整语料，用 `.wrong` 当"护栏"。
+- 本轮所有数字都来自真实运行；凡是没做的一律在 README 的
+  "Not implemented yet" 和本文件里点名，不含糊。
+
+**本日新增的 MoonBit 坑（已补进 `docs/MOONBIT_GOTCHAS.md`）**
+1. `pub struct` 的**私有字段类型也必须是 pub**，否则报 4046
+   （`A public definition cannot depend on private type`）。`Dictionary` 是 `pub`，
+   所以内部的 `SpellRule` 只能写成 `pub struct`（仍是不透明类型）。
+2. 嵌套数组字面量 `[[x]]` 在这里推断不出类型，需要先绑定：
+   `let applied : Array[Array[String]] = [rule.cont_flags]`。
+3. `x.is_none()` 已废弃（warning 0020），写 `x is None`。
+4. `(mask >> p) & 1 == 1` 又会踩 `&` 优先级低于 `==` 的老坑（第 23 条），
+   必须 `((mask >> p) & 1) == 1`。
+
+---
+
 ## 待续

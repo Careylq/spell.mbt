@@ -29,6 +29,9 @@ pub(all) struct AffFile {
   keyboard : String
   ignore_chars : String
   word_chars : String
+  check_sharps : Bool
+  breaks_declared : Bool
+  break_patterns : Array[String]
   compound_min : Int
   compound_flag : String?
   compound_begin : String?

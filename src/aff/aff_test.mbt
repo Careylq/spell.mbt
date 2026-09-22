@@ -263,6 +263,16 @@ test "FLAG long and FLAG UTF-8 are recognized" {
 }
 
 ///|
+test "CHECKSHARPS is a modelled directive, not an unknown one" {
+  let aff = @aff.parse_aff("SET UTF-8\nCHECKSHARPS\n")
+  @debug.debug_inspect(aff.check_sharps, content="true")
+  @debug.debug_inspect(aff.unrecognized.length(), content="0")
+  // absent: off, and still nothing unknown
+  let plain = @aff.parse_aff("SET UTF-8\n")
+  @debug.debug_inspect(plain.check_sharps, content="false")
+}
+
+///|
 test "an empty file yields an empty AST" {
   let aff = @aff.parse_aff("")
   @debug.debug_inspect(

@@ -124,6 +124,17 @@ pub(all) struct AffFile {
   keyboard : String
   ignore_chars : String
   word_chars : String
+  /// `CHECKSHARPS`: German `ß` may be written `SS` in an uppercased word, and a
+  /// `KEEPCASE` word containing `ß` may be capitalised or uppercased (but its
+  /// uppercased form may only use `SS`, never a sharp s).
+  check_sharps : Bool
+  /// Whether a `BREAK` directive appeared at all. `BREAK 0` declares "no break
+  /// points", which is different from the directive being absent (Hunspell then
+  /// breaks at `-`, `^-` and `-$`).
+  breaks_declared : Bool
+  /// The `BREAK` patterns, verbatim. A leading `^` or trailing `$` means "strip
+  /// that text at the start" or "at the end" instead of splitting there.
+  break_patterns : Array[String]
   compound_min : Int
   compound_flag : String?
   compound_begin : String?

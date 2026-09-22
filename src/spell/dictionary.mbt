@@ -31,21 +31,44 @@ pub impl Show for SpellError with fn to_string(self) {
 /// The type is opaque: the index representation is an implementation detail and
 /// may change. Use the accessors below to inspect the loaded file.
 pub struct Dictionary {
-  /// Every `(word, flags)` entry of the `.dic`, with duplicate words merged.
-  entries : Map[String, Array[String]]
-  prefix_rules : Array[@aff.AffixRule]
-  suffix_rules : Array[@aff.AffixRule]
+  /// Every `.dic` word mapped to its homonyms' flag vectors. A word that occurs
+  /// several times keeps one flag vector per occurrence, because Hunspell treats
+  /// them as alternatives: `foo`, `foo/X` and `foo/Y` make `foo` correct even
+  /// though the `X` homonym alone would not be.
+  entries : Map[String, Array[Array[String]]]
+  prefix_rules : Array[SpellRule]
+  suffix_rules : Array[SpellRule]
   forbiddenword : String?
   keepcase : String?
   needaffix : String?
   onlyincompound : String?
   compound_flag : String?
+  /// `COMPOUNDBEGIN` / `COMPOUNDEND`: the flags that licence a word as the
+  /// first or the last part of a compound (`check_compound`). `COMPOUNDMIDDLE`
+  /// is parsed but unused until compounds of three or more parts are handled.
+  compound_begin : String?
+  compound_end : String?
+  compound_middle : String?
+  /// The `COMPOUNDRULE` patterns, verbatim. A compound is correct when its
+  /// parts' flags match one of them (`check_compound_rule` parses them).
+  compound_rules : Array[String]
   /// `0` means the `.aff` had no `COMPOUNDMIN`; Hunspell's default of `3` is
   /// applied at match time.
   compound_min : Int
   /// `WORDCHARS`: characters that may appear inside a word. Only the trailing
   /// `.` (abbreviations such as `etc.`) is acted on today.
   word_chars : String
+  /// The characters listed by the `IGNORE` directive, as code points. They are
+  /// removed from dictionary entries, affix `strip`/`add` text and checked
+  /// words before any comparison (`remove_ignored`).
+  ignore_chars : Array[Char]
+  /// `CHECKSHARPS`: an uppercase word may spell a dictionary `ß` as `SS`, and a
+  /// `KEEPCASE` entry containing `ß` may be capitalised or uppercased.
+  check_sharps : Bool
+  /// The `BREAK` patterns: where a word may be split into two separately
+  /// correct parts (`check_breaks`). When the `.aff` has no `BREAK` line this
+  /// holds Hunspell's default (`-`, `^-`, `-$`); `BREAK 0` leaves it empty.
+  break_patterns : Array[String]
   encoding : String
   flag_type : @aff.FlagType
   rule_count : Int
@@ -79,29 +102,49 @@ pub fn Dictionary::from_text(
   let dic = @dic.parse_dic(strip_bom(dic_text), dic_flag_type) catch {
     error => raise DicParse(error)
   }
-  let entries : Map[String, Array[String]] = Map([])
+  let entries : Map[String, Array[Array[String]]] = Map([])
+  let ignore_chars = aff.ignore_chars.to_array()
   for entry in dic.entries {
     let flags : Array[String] = []
     for flag in entry.flags {
-      flags.push(resolve_alias(aff.flag_aliases, flag))
+      // An `AF` alias stands for a whole flag vector (`AF AB` is the flags `A`
+      // and `B`), so resolving one alias can add several flags.
+      for resolved in resolve_alias(aff.flag_aliases, flag, aff.flag_type) {
+        flags.push(resolved)
+      }
     }
-    match entries.get(entry.word) {
-      Some(existing) =>
-        for flag in flags {
-          if !existing.contains(flag) {
-            existing.push(flag)
-          }
-        }
-      None => entries[entry.word] = flags
+    // `IGNORE` characters are dropped from dictionary words as well as from the
+    // word being checked, so `مُدَرِّس` and `مدرس` become the same entry.
+    let word = remove_ignored(entry.word, ignore_chars)
+    match entries.get(word) {
+      Some(existing) => existing.push(flags)
+      None => {
+        let homonyms : Array[Array[String]] = [flags]
+        entries[word] = homonyms
+      }
     }
   }
-  let prefix_rules : Array[@aff.AffixRule] = []
-  let suffix_rules : Array[@aff.AffixRule] = []
+  let prefix_rules : Array[SpellRule] = []
+  let suffix_rules : Array[SpellRule] = []
   for rule in aff.affix_rules {
+    let cont_flags = decode_continuation(
+      rule.add,
+      aff.flag_aliases,
+      aff.flag_type,
+    )
     let cleaned = rule_without_continuation_flags(rule)
+    // The strip and add text are cleaned too: for `IGNORE aeiou` the rule
+    // `PFX A 0 re .` adds `r`, so `reexpression` and `rxprssn` both normalise to
+    // the same accepted form.
+    let cleaned = {
+      ..cleaned,
+      strip: remove_ignored(cleaned.strip, ignore_chars),
+      add: remove_ignored(cleaned.add, ignore_chars),
+    }
+    let spell_rule : SpellRule = { rule: cleaned, cont_flags, }
     match cleaned.kind {
-      @aff.Prefix => prefix_rules.push(cleaned)
-      @aff.Suffix => suffix_rules.push(cleaned)
+      @aff.Prefix => prefix_rules.push(spell_rule)
+      @aff.Suffix => suffix_rules.push(spell_rule)
     }
   }
   let special = aff.special_flags
@@ -114,12 +157,99 @@ pub fn Dictionary::from_text(
     needaffix: special.needaffix,
     onlyincompound: special.onlyincompound,
     compound_flag: aff.compound_flag,
+    compound_begin: aff.compound_begin,
+    compound_end: aff.compound_end,
+    compound_middle: aff.compound_middle,
+    compound_rules: aff.compound_rules,
     compound_min: aff.compound_min,
     word_chars: aff.word_chars,
+    ignore_chars,
+    check_sharps: aff.check_sharps,
+    break_patterns: if aff.breaks_declared {
+      aff.break_patterns
+    } else {
+      ["-", "^-", "-$"]
+    },
     encoding: aff.encoding,
     flag_type: aff.flag_type,
     rule_count: aff.affix_rules.length(),
   }
+}
+
+///|
+/// Remove every character listed in the `.aff` `IGNORE` directive from `text`.
+///
+/// Hunspell treats those characters as invisible: they are dropped from
+/// dictionary entries and from the word being checked before the two are
+/// compared. `ignored` holds the characters as code points, so an entry may
+/// list multi-byte characters (Arabic diacritics, the right-to-left mark).
+fn remove_ignored(text : String, ignored : Array[Char]) -> String {
+  if ignored.is_empty() {
+    return text
+  }
+  let buffer = StringBuilder()
+  for c in text {
+    if !ignored.contains(c) {
+      buffer.write_char(c)
+    }
+  }
+  buffer.to_string()
+}
+
+///|
+/// A `PFX`/`SFX` rule as the judgement engine needs it: the rule with the
+/// continuation-flag list cut off its `add` text, plus that list as flags.
+///
+/// `SFX A 0 s/123 .` adds `s` and gives the derived form the flags `1`, `2`
+/// and `3`; chaining a second affix through those flags is what
+/// `cont_flags` enables.
+///
+/// The type is an implementation detail of the index (`Dictionary` is opaque),
+/// so it is never constructed by a caller.
+pub struct SpellRule {
+  rule : @aff.AffixRule
+  cont_flags : Array[String]
+}
+
+///|
+/// The flags listed after the `/` of a rule's `add` field. An `add` without a
+/// `/` has no continuation flags.
+///
+/// Without an `AF` table the list is a plain flag list in the file's `FLAG`
+/// mode (`s/123` is the flags `1`, `2`, `3`). With an `AF` table the entries are
+/// alias indices instead (`y/2` is whatever flag vector alias `2` names), and
+/// each one expands to the flags it stands for.
+fn decode_continuation(
+  add : String,
+  aliases : Array[String],
+  flag_type : @aff.FlagType,
+) -> Array[String] {
+  let chars = add.to_array()
+  let mut index = 0
+  while index < chars.length() && chars[index] != '/' {
+    index = index + 1
+  }
+  if index >= chars.length() {
+    return []
+  }
+  let buffer = StringBuilder()
+  let mut cursor = index + 1
+  while cursor < chars.length() {
+    buffer.write_char(chars[cursor])
+    cursor = cursor + 1
+  }
+  let raw = buffer.to_string()
+  if aliases.is_empty() {
+    return @dic.decode_flags(raw, flag_type)
+  }
+  // Alias indices are stored as decimal numbers, exactly as in the `.dic`.
+  let flags : Array[String] = []
+  for entry in @dic.decode_flags(raw, Num) {
+    for resolved in resolve_alias(aliases, entry, flag_type) {
+      flags.push(resolved)
+    }
+  }
+  flags
 }
 
 ///|
@@ -172,23 +302,31 @@ fn add_without_flags(add : String) -> String {
 }
 
 ///|
-/// Resolve one `.dic` flag through the `AF` alias table.
+/// Resolve one `.dic` flag through the `AF` alias table into the flags it
+/// stands for.
 ///
-/// Outside the table's range (or when the flag is not a number) the flag is
-/// returned unchanged, so a `.dic` that uses literal flags still works.
-fn resolve_alias(aliases : Array[String], flag : String) -> String {
+/// With no `AF` table the flag is returned as-is. Otherwise a decimal flag is
+/// an alias index (`1` is the first `AF` body line) and its value is a flag
+/// *vector*, which is split with the file's `FLAG` mode: `AF AB` in
+/// single-character mode is the two flags `A` and `B`. An out-of-range index or
+/// a non-numeric flag is kept verbatim, so a `.dic` that mixes both still works.
+fn resolve_alias(
+  aliases : Array[String],
+  flag : String,
+  flag_type : @aff.FlagType,
+) -> Array[String] {
   if aliases.is_empty() {
-    return flag
+    return [flag]
   }
   let parsed : Int? = Some(@string.parse_int(flag)) catch { _ => None }
   match parsed {
     Some(index) =>
       if index >= 1 && index <= aliases.length() {
-        aliases[index - 1]
+        @dic.decode_flags(aliases[index - 1], flag_type)
       } else {
-        flag
+        [flag]
       }
-    None => flag
+    None => [flag]
   }
 }
 

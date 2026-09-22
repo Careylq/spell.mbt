@@ -78,6 +78,16 @@ pub fn parse_aff(text : String) -> AffFile raise AffParseError {
       "KEY" => builder.keyboard = arg_at(line, 1, name)
       "IGNORE" => builder.ignore_chars = arg_at(line, 1, name)
       "WORDCHARS" => builder.word_chars = arg_at(line, 1, name)
+      "CHECKSHARPS" => builder.check_sharps = true
+      "BREAK" => {
+        let count = parse_count(arg_at(line, 1, name), line.number, name)
+        builder.breaks_declared = true
+        let (body, next) = take_body(lines, index, name, count, line.number)
+        index = next
+        for entry in body {
+          builder.break_patterns.push(arg_at(entry, 1, name))
+        }
+      }
       "COMPOUNDMIN" =>
         builder.compound_min = parse_count(
           arg_at(line, 1, name),
@@ -142,6 +152,9 @@ priv struct AffBuilder {
   mut keyboard : String
   mut ignore_chars : String
   mut word_chars : String
+  mut check_sharps : Bool
+  mut breaks_declared : Bool
+  break_patterns : Array[String]
   mut compound_min : Int
   mut compound_flag : String?
   mut compound_begin : String?
@@ -178,6 +191,9 @@ fn new_builder() -> AffBuilder {
     keyboard: "",
     ignore_chars: "",
     word_chars: "",
+    check_sharps: false,
+    breaks_declared: false,
+    break_patterns: [],
     compound_min: 0,
     compound_flag: None,
     compound_begin: None,
@@ -222,6 +238,9 @@ fn finish(builder : AffBuilder) -> AffFile {
     keyboard: builder.keyboard,
     ignore_chars: builder.ignore_chars,
     word_chars: builder.word_chars,
+    check_sharps: builder.check_sharps,
+    breaks_declared: builder.breaks_declared,
+    break_patterns: builder.break_patterns,
     compound_min: builder.compound_min,
     compound_flag: builder.compound_flag,
     compound_begin: builder.compound_begin,

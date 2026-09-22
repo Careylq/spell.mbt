@@ -180,12 +180,20 @@ fn read_bytes(path : String) -> Result[Bytes, String] {
 /// Read the `SET` directive without needing to know the encoding yet: the
 /// directive itself is ASCII, so a byte-preserving decode is enough to find it.
 /// A leading UTF-8 byte-order mark is skipped so it cannot hide the directive.
+///
+/// `FLAG UTF-8` is treated as declaring the file encoding when there is no
+/// `SET` line: one flag is one Unicode character, so the flag text can only be
+/// meant as UTF-8. (The corpus' `flagutf8` suite is exactly this shape, and
+/// without this rule a multi-byte flag character is read as two Latin-1
+/// characters in the `.aff` but as two one-character flags in the `.dic`, so
+/// the two never compare equal.)
 fn sniff_encoding(bytes : Bytes) -> FileEncoding {
   let text = decode_bytes(bytes, Latin1)
   let text = match text.strip_prefix("\u{00EF}\u{00BB}\u{00BF}") {
     Some(rest) => rest.to_owned()
     None => text
   }
+  let mut flag_utf8 = false
   for line in text.split("\n") {
     let trimmed = line.trim()
     if trimmed.is_empty() {
@@ -205,6 +213,19 @@ fn sniff_encoding(bytes : Bytes) -> FileEncoding {
         }
       None => ()
     }
+    match trimmed.strip_prefix("FLAG") {
+      Some(rest) =>
+        if !rest.is_empty() && first_char_is_space(rest) {
+          let name = rest.trim()
+          if name == "UTF-8" || name == "utf-8" {
+            flag_utf8 = true
+          }
+        }
+      None => ()
+    }
+  }
+  if flag_utf8 {
+    return Utf8
   }
   // No `SET` line: Hunspell's documented default is ISO8859-1.
   Latin1

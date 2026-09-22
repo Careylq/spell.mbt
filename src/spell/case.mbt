@@ -41,20 +41,24 @@ fn is_upper_char(c : Char) -> Bool {
 /// Only ASCII lower-case letters are recognised, which is enough for the two
 /// classifications that matter: a word with no upper-case letters behaves as
 /// `Lower`, so a non-ASCII lower-case letter does not need to be identified.
-fn is_lower_char(c : Char) -> Bool {
-  c.is_ascii_lowercase()
+///
+/// `sharps` counts `ß` as lower-case. Under `CHECKSHARPS` a word such as `MÜßIG`
+/// must be treated as mixed case (so it only matches exactly), because an
+/// uppercased form of a word with `ß` may only spell it `SS`.
+fn is_lower_char(c : Char, sharps : Bool) -> Bool {
+  c.is_ascii_lowercase() || (sharps && c == 'ß')
 }
 
 ///|
 /// Classify the capitalisation shape of `word`.
-fn classify_case(word : String) -> CaseKind {
+fn classify_case(word : String, sharps : Bool) -> CaseKind {
   let chars = word.to_array()
   let mut upper = 0
   let mut lower = 0
   for c in chars {
     if is_upper_char(c) {
       upper = upper + 1
-    } else if is_lower_char(c) {
+    } else if is_lower_char(c, sharps) {
       lower = lower + 1
     }
   }

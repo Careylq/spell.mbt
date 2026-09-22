@@ -19,16 +19,23 @@ pub impl Show for SpellError
 
 // Types and methods
 pub struct Dictionary {
-  entries : Map[String, Array[String]]
-  prefix_rules : Array[@aff.AffixRule]
-  suffix_rules : Array[@aff.AffixRule]
+  entries : Map[String, Array[Array[String]]]
+  prefix_rules : Array[SpellRule]
+  suffix_rules : Array[SpellRule]
   forbiddenword : String?
   keepcase : String?
   needaffix : String?
   onlyincompound : String?
   compound_flag : String?
+  compound_begin : String?
+  compound_end : String?
+  compound_middle : String?
+  compound_rules : Array[String]
   compound_min : Int
   word_chars : String
+  ignore_chars : Array[Char]
+  check_sharps : Bool
+  break_patterns : Array[String]
   encoding : String
   flag_type : @aff.FlagType
   rule_count : Int
@@ -39,6 +46,11 @@ pub fn Dictionary::entry_count(Self) -> Int
 pub fn Dictionary::flag_type(Self) -> @aff.FlagType
 pub fn Dictionary::from_text(String, String) -> Self raise SpellError
 pub fn Dictionary::rule_count(Self) -> Int
+
+pub struct SpellRule {
+  rule : @aff.AffixRule
+  cont_flags : Array[String]
+}
 
 // Type aliases
 

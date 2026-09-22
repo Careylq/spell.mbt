@@ -25,16 +25,28 @@ actual run of the harness, not an estimate.
 
 | Metric | Passing | Total | Pass rate |
 |---|---|---|---|
-| `.good` (must be accepted) | 459 | 848 | 54.1% |
-| `.wrong` (must be rejected) | 570 | 613 | 93.0% |
+| `.good` (must be accepted) | 718 | 848 | 84.7% |
+| `.wrong` (must be rejected) | 579 | 613 | 94.5% |
 | `.sug` (expected suggestions) | not implemented | 37 files | out of scope for v1 |
 
-The remaining `.good` gap is dominated by features this release deliberately leaves out:
-`COMPOUNDRULE`/`COMPOUNDBEGIN`/`CHECKCOMPOUNDPATTERN` and the German compounding suites,
-affix continuation flags (`SFX A 0 s/123 .`, i.e. twofold suffix stripping), `IGNORE`
-characters, `COMPLEXPREFIXES`, and full Unicode case folding (German `ß` → `SS`). The
-`.wrong` column is the stronger result: only 43 of 613 words that must be rejected are
-wrongly accepted. Run `bash conformance/run.sh` locally to reproduce.
+The remaining `.good` gap is dominated by the compound engines this release still
+leaves partial: `COMPOUNDMIDDLE`, `CHECKCOMPOUNDPATTERN`, affixed parts inside
+compounds and the German `COMPOUNDBEGIN`/`COMPOUNDMIDDLE`/`COMPOUNDEND` suites
+(`germancompounding` and `germancompoundingold` alone account for 26 of the 130
+missing words). After that come the `ICONV`/`OCONV` conversion tables
+(`iconv*`/`oconv*`), `COMPLEXPREFIXES` (twofold prefix stripping), and the
+Hungarian `COMPOUNDSYLLABLE`/`COMPOUNDFORBIDFLAG` rules. The `.wrong` column is
+the stronger result: only 34 of 613 words that must be rejected are wrongly
+accepted. Run `bash conformance/run.sh` locally to reproduce.
+
+> Measurement caveat: the harness pairs each `.good` line with the verdict of the
+> matching input line using `paste -d' '`, so a corpus line that itself contains a
+> space is misaligned. `morph.good` has 16 such lines (`drink eat`, …); the
+> library accepts all of them (they are checked as whitespace-separated groups,
+> and each word in the group is correct), but the harness can only report 10 of
+> the 26 `morph.good` lines. That is a limitation of the measurement, not of the
+> library, and the harness was deliberately left untouched so the numbers stay
+> comparable.
 
 ## Why
 
@@ -99,8 +111,9 @@ list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`
 ### Implemented
 
 - **`.aff` parser** — `SET`, `FLAG`, `AF`, `AM`, `PFX`, `SFX`, `REP`, `TRY`, `KEY`,
-  `IGNORE`, `WORDCHARS`, `COMPOUND*`, and the special-flag directives (`NOSUGGEST`,
-  `KEEPCASE`, `FORBIDDENWORD`, `NEEDAFFIX`, `CIRCUMFIX`, `ONLYINCOMPOUND`).
+  `IGNORE`, `WORDCHARS`, `CHECKSHARPS`, `BREAK`, `COMPOUND*`, and the special-flag
+  directives (`NOSUGGEST`, `KEEPCASE`, `FORBIDDENWORD`, `NEEDAFFIX`, `CIRCUMFIX`,
+  `ONLYINCOMPOUND`).
   Unmodelled directives are collected in an `unrecognized` list rather than dropped.
   Errors carry 1-based line numbers.
 - **`.dic` parser** — entry count (text after the count on the same line is ignored, as
@@ -111,17 +124,44 @@ list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`
   suffixes) and `apply_rule` (condition then strip then add).
   Unicode-correct: matching iterates code points, so non-BMP characters work.
 - **`spell()` judgement** — the correctness core:
-  * direct dictionary hits;
+  * direct dictionary hits, with **homonyms treated as alternatives** (`foo`, `foo/X`
+    and `foo/Y` make `foo` correct, while a `FORBIDDENWORD` homonym rejects it);
   * affix-derived forms found by **reverse lookup** (reconstruct the candidate stem from
     the word, check the stem's flag and the rule condition, then re-apply the rule as a
     guard) rather than by generating every form;
   * one prefix **and** one suffix on the same stem when both blocks declare
-    `cross_product`;
+    `cross_product`, including the case where the prefix is licensed by the suffix's
+    continuation flags (`undrinkable` from `drink/RQ` and `SFX R 0 able/PS .`);
+  * **affix continuation flags / twofold suffix stripping** — `SFX A 0 s/123 .` gives the
+    derived form the flags `1`, `2` and `3`, so a second suffix can be chained onto it and
+    a prefix can sit in front of the pair (`unfoosbar`);
+  * `AF` alias entries expand to the flag **vectors** they name, in the `.dic` and in
+    continuation-flag lists alike;
+  * `NEEDAFFIX` and `ONLYINCOMPOUND` are honoured on dictionary entries and on affix
+    continuation classes alike (`foos` is not a word when `SFX A 0 s/XB .` gives it
+    `NEEDAFFIX`; `foosbar` is);
   * capitalisation rules: all-lowercase, `Capitalised`, `ALL CAPS` and mixed case (mixed
     case must match exactly);
-  * special flags `FORBIDDENWORD`, `KEEPCASE`, `NEEDAFFIX`, `ONLYINCOMPOUND`;
-  * a trailing `.` is accepted for abbreviations when `WORDCHARS` declares `.`;
-  * the basic two-word compound (`COMPOUNDFLAG`, `COMPOUNDMIN`, default `3`).
+  * `CHECKSHARPS`: an uppercased word may spell a dictionary `ß` as `SS`
+    (`PROZESSIONSSTRASSE` finds `Prozessionsstraße`), a capital sharp s (`ẞ`, U+1E9E)
+    folds to `ß`, and a `KEEPCASE` word containing `ß` may be capitalised or uppercased
+    with `SS` but not with a sharp s (`MÜßIG` stays wrong);
+  * special flags `FORBIDDENWORD`, `KEEPCASE` (including on compound parts),
+    `NEEDAFFIX`, `ONLYINCOMPOUND`;
+  * `IGNORE` characters are dropped from dictionary entries, from affix `strip`/`add`
+    text and from the checked word before any comparison (Arabic harakat, right-to-left
+    marks);
+  * a trailing `.` is accepted for abbreviations when `WORDCHARS` declares `.`, and a
+    number with one separator (`.`, `,`, `-`) between digits is accepted when
+    `WORDCHARS` declares that separator (`1.12345`, `4,2`, `42-42`);
+  * `BREAK` splitting, recursively: the declared break points, or Hunspell's defaults
+    `-`, `^-` and `-$` (`foo-bar-foo-bar`), with `BREAK 0` switching breaking off;
+  * a line of whitespace-separated words is correct when every word on it is correct;
+  * two-part compounds whose parts carry `COMPOUNDFLAG`, `COMPOUNDBEGIN` or
+    `COMPOUNDEND` (`COMPOUNDMIN`, default `3`);
+  * `COMPOUNDRULE` patterns over the parts' compound flags, with `*` (zero or more),
+    `?` (zero or one) and parenthesized multi-character flags, matched by recursive
+    decomposition of the word (so `1*`-style rules such as `n*mp` accept `100th`).
 - **Encodings at the CLI** — the `SET` directive is sniffed from the `.aff` bytes and
   used to decode the `.aff`, the `.dic` and the word input: UTF-8, ISO8859-1, ISO8859-15
   (the eight code points that differ from Latin-1) and other single-byte encodings as
@@ -136,32 +176,25 @@ each of wasm, wasm-gc, js and native.
 
 ### Not implemented yet
 
-- **Suggestion generation** (`suggest()`) — edit distance, `REP`/`TRY`/`KEY` ranking.
-  The `.sug` corpus is therefore out of scope for this release.
-- **Compounds beyond the basic two-part case** — `COMPOUNDRULE`, `COMPOUNDBEGIN`/
-  `COMPOUNDEND`/`COMPOUNDMIDDLE`, `CHECKCOMPOUNDPATTERN`, `CHECKCOMPOUNDDUP`/`TRIPLE`
-  and the German compounding suites are not applied. A word is accepted as a compound
-  when it splits into exactly two plain dictionary words that both carry
-  `COMPOUNDFLAG`; affixed parts are not tried.
-- **Affix continuation flags / twofold affix stripping** — in `SFX A 0 s/123 .` the
-  flags after `/` are ignored, so only the first affix is applied. This is why the
-  `flag`, `flaglong`, `flagnum`, `flagutf8`, `alias*`, `needaffix*` and `zeroaffix`
-  suites still lose words.
-- **`IGNORE` characters** — the directive is parsed but ignored characters are not
-  removed before matching.
-- **`COMPLEXPREFIXES`**, `CHECKSHARPS`, `FORCEUCASE`, and `NOSUGGEST` semantics at
-  lookup time.
-- **Full Unicode case folding** — lowercasing uses `moonbitlang/x/unicode`, but
-  upper-casing is ASCII-only, so a German `ß` does not expand to `SS` and a non-ASCII
-  first letter is not capitalised.
-- **`FULLSTRIP` and `PSEUDOROOT`** handling, and Hunspell's word splitting for corpus
-  lines that contain spaces.
+- **Compounds of three or more parts, and affixed parts inside a compound** — the
+  two-part case is handled, and `COMPOUNDRULE` decomposition is recursive, but a compound
+  part must be a plain dictionary entry. `COMPOUNDMIDDLE`, `COMPOUNDPERMITFLAG`/
+  `COMPOUNDFORBIDFLAG`, `CHECKCOMPOUNDPATTERN`, `CHECKCOMPOUNDDUP`/`TRIPLE`,
+  `COMPOUNDWORDMAX`/`COMPOUNDSYLLABLE` and `CHECKCOMPOUNDREP` are parsed but not applied,
+  which is why the German `germancompounding*` suites and `limit-multiple-compounding`
+  still lose words.
+- **`COMPLEXPREFIXES`** (twofold prefix stripping, needed by `alias3` and
+  `complexprefixes*`).
+- **`ICONV`/`OCONV`** conversion tables — parsed but not applied, so the `iconv*`/
+  `oconv*` suites lose words. `MAP` only participates in suggestion generation.
+- **`FORCEUCASE`** and `NOSUGGEST` semantics at lookup time (both are parsed).
+- **`FULLSTRIP`, `PSEUDOROOT` and `COMPOUNDROOT`** handling.
+- **Unicode upper-casing** — lowercasing uses `moonbitlang/x/unicode`, but upper-casing
+  is ASCII-only, so a non-ASCII first letter is not capitalised (`dotless_i` and the
+  Turkish/Azeri casing rules). `CHECKSHARPS` covers German `ß` explicitly.
+- **Suggestion generation** (`suggest()`), and therefore the `.sug` corpus.
 - FFI bindings to the Hunspell C++ library (this is a pure MoonBit implementation).
 - Any UI / editor plugin.
-
-**Known limitations:** the ligature/mapping directives (`MAP`, `ICONV`, `OCONV`) only
-participate in suggestion generation, which is out of scope, so they are parsed but not
-applied.
 
 ## Design
 

@@ -209,6 +209,43 @@ pub using @spell { type Dictionary, type SpellError, load, check }
 - `@env.args()` 第 0 个元素是程序自身路径，用户参数从下标 1 开始；
   退出码用 `moonbitlang/x/sys` 的 `exit(Int)`（wasm 后端映射到 `proc_exit`）。
 
+## 26. 🔴 `pub struct` 的**私有字段类型也必须是 `pub`**
+
+- **症状**：给 `pub struct Dictionary` 加一个字段，字段类型是 `priv struct SpellRule`，
+  报错 `4046 A public definition cannot depend on private type`。
+- **说明**：字段本身是私有的（`Dictionary` 是不透明类型），但编译器仍然要求
+  字段**类型**的可见性不低于容器。`priv enum CpdAtom` 放在 `pub struct` 的字段里
+  同样报 4046。
+- **两种修法**：
+  1. 把类型改成 `pub struct X { ... }`（字段仍私有，外部不能构造，`.mbti` 里只多一个
+     不透明类型名）；
+  2. 不要把这个类型放进 `pub` 结构体字段——例如只存 `Array[String]`（原始文本），
+     在私有函数里现解析。本项目 `COMPOUNDRULE` 就是这么做：字段存 `Array[String]`，
+     `parse_compound_rule` 在匹配时调用。
+
+## 27. 嵌套数组字面量 `[[x]]` 推断不出类型
+
+- **症状**：`self.derived_standalone([[rule.cont_flags]])` 报 4014
+  `Expr Type Mismatch: has type Array[String], wanted String`。
+- **正确写法**：先绑定并标注类型，再传：
+  ```moonbit
+  let applied : Array[Array[String]] = [rule.cont_flags]
+  if !self.derived_standalone(applied) { ... }
+  ```
+- **同类**：`entries[word] = [flags]` 给 `Map[String, Array[Array[String]]]` 赋值时
+  也要先绑定。
+
+## 28. `x.is_none()` / `x.is_some()` 已废弃（warning 0020）
+
+- **正确写法**：`x is None` / `x is Some(_)`（`match` 一直都可以）。
+- 注意 `x is None && y is None` 里的 `is` 与 `&&` 结合正常，不需要额外括号。
+
+## 29. `>>`/`&`/`==` 的优先级（第 23 条的延伸）
+
+- `(mask >> p) & 1 == 1` 被解析成 `(mask >> p) & (1 == 1)`，报类型错并附带
+  warning 0051 `ambiguous_precedence`。
+- 必须写 `((mask >> p) & 1) == 1`。**只要 `&` 和 `==` 同现，就加括号。**
+
 ---
 
 ## 附二：实现过程中被测试抓出来的两个真 bug（值得记住）

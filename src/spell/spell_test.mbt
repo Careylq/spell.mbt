@@ -310,24 +310,54 @@ test "a trailing dot is not special without WORDCHARS" {
 }
 
 ///|
-test "affix continuation flags are cut off the add field" {
-  // `SFX A 0 s/123 .` adds `s` and gives the result flags 1, 2 and 3. Chaining a
-  // second affix through those flags is not implemented, but the first affix has
-  // to work, which means `add` must be read as `s`, not `s/123`.
+test "affix continuation flags chain a second affix" {
+  // `SFX A 0 s/123 .` adds `s` and gives the derived form the flags 1, 2 and 3,
+  // so a rule signed with one of those flags can be attached to it.
   let aff =
     #|SET UTF-8
     #|SFX A Y 1
     #|SFX A 0 s/123 .
     #|SFX 1 Y 1
     #|SFX 1 0 bar .
+    #|SFX 2 Y 1
+    #|SFX 2 0 baz .
+    #|PFX 3 Y 1
+    #|PFX 3 0 un .
   let dic =
     #|1
     #|foo/A3
   let dictionary = load(aff, dic)
   assert_true(dictionary.check("foo"))
   assert_true(dictionary.check("foos"))
-  // the chained form is the documented limitation
-  assert_false(dictionary.check("foosbar"))
+  // the continuation flags of A license a second suffix on `foos`
+  assert_true(dictionary.check("foosbar"))
+  assert_true(dictionary.check("foosbaz"))
+  // ...and the prefix `un-`, which is signed with flag 3
+  assert_true(dictionary.check("unfoo"))
+  assert_true(dictionary.check("unfoos"))
+  // a prefix plus two suffixes
+  assert_true(dictionary.check("unfoosbar"))
+  assert_true(dictionary.check("unfoosbaz"))
+  // `add` is still read as `s`, not `s/123`
+  assert_false(dictionary.check("foos/123"))
+}
+
+///|
+test "continuation flags cannot chain a third suffix" {
+  let aff =
+    #|SET UTF-8
+    #|SFX A Y 1
+    #|SFX A 0 s/AB .
+    #|SFX B Y 1
+    #|SFX B 0 y/B .
+  let dic =
+    #|1
+    #|foo/A
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("foos"))
+  assert_true(dictionary.check("foosy"))
+  // three suffixes deep is past the twofold limit
+  assert_false(dictionary.check("foosyy"))
 }
 
 ///|
@@ -336,6 +366,395 @@ test "a leading UTF-8 BOM is ignored" {
   let dic = "\u{FEFF}1\ncat"
   let dictionary = load(aff, dic)
   assert_true(dictionary.check("cat"))
+}
+
+///|
+test "IGNORE characters are dropped from entries, affixes and checked words" {
+  // `IGNORE` lists characters Hunspell treats as invisible. They are removed
+  // from `.dic` entries, from a rule's `strip`/`add` text and from the word
+  // being checked, so a dictionary written without the ignored characters still
+  // accepts them.
+  let aff =
+    #|SET UTF-8
+    #|IGNORE aeiou
+    #|PFX P Y 1
+    #|PFX P 0 pre .
+  let dic =
+    #|2
+    #|cnsnnt/P
+    #|rhythm
+  let dictionary = load(aff, dic)
+  // the entry without its ignored vowels
+  assert_true(dictionary.check("cnsnnt"))
+  assert_true(dictionary.check("consonant"))
+  // an entry with no ignored characters is unaffected
+  assert_true(dictionary.check("rhythm"))
+  // the prefix rule's `add` text is cleaned as well (`pre` -> `pr`), so the
+  // spelled-out and the reduced spellings of the same word both match
+  assert_true(dictionary.check("preconsonant"))
+  assert_true(dictionary.check("prcnsnnt"))
+  // characters that are not listed still have to match
+  assert_false(dictionary.check("postconsonant"))
+  assert_false(dictionary.check("consonants"))
+  assert_false(dictionary.check("consonantx"))
+  assert_eq(dictionary.entry_count(), 2)
+}
+
+///|
+test "an IGNORE-only word is never correct" {
+  // Removing the ignored characters can leave an empty string; that must not be
+  // accepted just because it matched nothing.
+  let aff =
+    #|SET UTF-8
+    #|IGNORE xy
+  let dic =
+    #|1
+    #|cat
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("cat"))
+  assert_false(dictionary.check("xy"))
+  assert_false(dictionary.check("x"))
+}
+
+///|
+test "CHECKSHARPS lets SS spell a dictionary sharp s in an uppercased word" {
+  let aff =
+    #|SET UTF-8
+    #|CHECKSHARPS
+    #|KEEPCASE k
+  let dic =
+    #|3
+    #|Straße
+    #|Fußweg
+    #|müßig/k
+  let dictionary = load(aff, dic)
+  // exact forms still work
+  assert_true(dictionary.check("Straße"))
+  assert_true(dictionary.check("Fußweg"))
+  // uppercased: `ß` is spelled `SS`
+  assert_true(dictionary.check("STRASSE"))
+  assert_true(dictionary.check("FUSSWEG"))
+  // a capital sharp s (`ẞ`, U+1E9E) folds to `ß`, so it works in `ALL CAPS`
+  assert_true(dictionary.check("STRAẞE"))
+  // `CHECKSHARPS` also lets a `KEEPCASE` word with `ß` be capitalised and
+  // uppercased, as long as the uppercased form uses `SS`
+  assert_true(dictionary.check("müßig"))
+  assert_true(dictionary.check("Müßig"))
+  assert_true(dictionary.check("MÜSSIG"))
+  // ...but an uppercased word of a `KEEPCASE` entry may not keep a sharp s
+  assert_false(dictionary.check("MÜßIG"))
+  // and `ss` in a merely capitalised word is still not a sharp s
+  assert_false(dictionary.check("Müssig"))
+  assert_false(dictionary.check("Strassse"))
+}
+
+///|
+test "without CHECKSHARPS a sharp s is not spelled SS" {
+  let aff =
+    #|SET UTF-8
+    #|KEEPCASE k
+  let dic =
+    #|2
+    #|Straße
+    #|müßig/k
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("Straße"))
+  assert_false(dictionary.check("STRASSE"))
+  assert_false(dictionary.check("MÜSSIG"))
+  // `KEEPCASE` still blocks the capitalised form
+  assert_false(dictionary.check("Müßig"))
+  // the exact `KEEPCASE` form is correct
+  assert_true(dictionary.check("müßig"))
+}
+
+///|
+test "COMPOUNDRULE patterns use *, ? and literal flags" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDMIN 1
+    #|COMPOUNDRULE 1
+    #|COMPOUNDRULE A*B?C
+  let dic =
+    #|3
+    #|a/A
+    #|b/B
+    #|c/C
+  let dictionary = load(aff, dic)
+  // `A*` is zero or more parts, `B?` is zero or one, `C` is exactly one
+  assert_true(dictionary.check("ac"))
+  assert_true(dictionary.check("aac"))
+  assert_true(dictionary.check("abc"))
+  assert_true(dictionary.check("aabc"))
+  assert_true(dictionary.check("bc"))
+  // every part has to be consumed, in pattern order
+  assert_false(dictionary.check("ab"))
+  assert_false(dictionary.check("ca"))
+  assert_false(dictionary.check("acc"))
+  assert_false(dictionary.check("abbc"))
+  assert_false(dictionary.check("acb"))
+}
+
+///|
+test "COMPOUNDRULE parenthesized atoms for FLAG long" {
+  let aff =
+    #|SET UTF-8
+    #|FLAG long
+    #|COMPOUNDMIN 1
+    #|COMPOUNDRULE 1
+    #|COMPOUNDRULE (nn)*(tt)?(pp)
+  let dic =
+    #|4
+    #|n/nn
+    #|x/nn
+    #|t/tt
+    #|p/pp
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("ntp"))
+  assert_true(dictionary.check("nxp"))
+  assert_true(dictionary.check("np"))
+  assert_true(dictionary.check("tp"))
+  assert_false(dictionary.check("tnp"))
+  assert_false(dictionary.check("nt"))
+  assert_false(dictionary.check("ntpp"))
+}
+
+///|
+test "COMPOUNDRULE parts respect ONLYINCOMPOUND and FORBIDDENWORD" {
+  let aff =
+    #|SET UTF-8
+    #|FORBIDDENWORD F
+    #|ONLYINCOMPOUND O
+    #|COMPOUNDMIN 1
+    #|COMPOUNDRULE 1
+    #|COMPOUNDRULE A*B
+  let dic =
+    #|4
+    #|a/A
+    #|b/BO
+    #|ab/F
+    #|bob
+  let dictionary = load(aff, dic)
+  // a part flagged ONLYINCOMPOUND is usable inside a compound...
+  assert_true(dictionary.check("aab"))
+  // ...but not on its own
+  assert_false(dictionary.check("b"))
+  assert_true(dictionary.check("bob"))
+  // a FORBIDDENWORD entry is subtracted even though the pattern would match
+  assert_false(dictionary.check("ab"))
+}
+
+///|
+test "AF aliases expand to flag vectors, including in continuation flags" {
+  // `AF PQ` is two flags, and `SFX Q 0 er/2 .` names alias 2 (flag `P`) as the
+  // continuation flag of the derived form.
+  let aff =
+    #|SET UTF-8
+    #|AF 2
+    #|AF PQ
+    #|AF P
+    #|SFX P Y 1
+    #|SFX P 0 ing .
+    #|SFX Q Y 1
+    #|SFX Q 0 er/2 .
+  let dic =
+    #|1
+    #|walk/1
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("walk"))
+  assert_true(dictionary.check("walking"))
+  assert_true(dictionary.check("walker"))
+  assert_true(dictionary.check("walkering"))
+  assert_false(dictionary.check("walkerings"))
+}
+
+///|
+test "homonym entries are alternatives, not a union of flags" {
+  // `work` occurs twice: once as a virtual stem (`NEEDAFFIX`) and once as a
+  // plain word. The plain homonym makes `work` correct; `note` only occurs with
+  // `NEEDAFFIX`, so it stays a virtual stem.
+  let aff =
+    #|SET UTF-8
+    #|NEEDAFFIX X
+    #|SFX S Y 1
+    #|SFX S 0 s .
+  let dic =
+    #|3
+    #|work/X
+    #|work
+    #|note/XS
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("work"))
+  assert_false(dictionary.check("note"))
+  assert_true(dictionary.check("notes"))
+  assert_eq(dictionary.entry_count(), 2)
+}
+
+///|
+test "a FORBIDDENWORD homonym forbids the whole word" {
+  let aff =
+    #|SET UTF-8
+    #|FORBIDDENWORD F
+  let dic =
+    #|2
+    #|bad/F
+    #|bad
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("bad"))
+}
+
+///|
+test "NEEDAFFIX on an affix makes the derived form a virtual stem" {
+  // `SFX A 0 s/XB .` hands the derived form both `B` and `NEEDAFFIX` (`X`), so
+  // `foos` is not a word on its own but `foosbar` is.
+  let aff =
+    #|SET UTF-8
+    #|NEEDAFFIX X
+    #|SFX A Y 1
+    #|SFX A 0 s/XB .
+    #|SFX B Y 1
+    #|SFX B 0 bar .
+  let dic =
+    #|1
+    #|foo/A
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("foo"))
+  assert_false(dictionary.check("foos"))
+  assert_true(dictionary.check("foosbar"))
+}
+
+///|
+test "ONLYINCOMPOUND on an affix keeps the derived form out of standalone use" {
+  let aff =
+    #|SET UTF-8
+    #|ONLYINCOMPOUND X
+    #|SFX A Y 1
+    #|SFX A 0 s/X .
+  let dic =
+    #|1
+    #|foo/A
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("foo"))
+  assert_false(dictionary.check("foos"))
+}
+
+///|
+test "numbers with separators are accepted when the separators sit between digits" {
+  let aff =
+    #|SET UTF-8
+    #|WORDCHARS 0123456789.-,
+  let dic =
+    #|1
+    #|foo
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("1"))
+  assert_true(dictionary.check("1234567"))
+  assert_true(dictionary.check("1.1"))
+  assert_true(dictionary.check("1234567.123456"))
+  assert_true(dictionary.check("4,2"))
+  assert_true(dictionary.check("42-42"))
+  // at most one separator, and never adjacent or at an end
+  assert_false(dictionary.check("1..2"))
+  assert_false(dictionary.check("1,,2"))
+  assert_false(dictionary.check("1.,2"))
+  assert_false(dictionary.check("1,.2"))
+  // a leading or trailing separator is not a number (`,1` cannot be rescued by
+  // a break, unlike `-1`, which the default `^-` break strips)
+  assert_false(dictionary.check(",1"))
+  assert_false(dictionary.check("1,"))
+  assert_false(dictionary.check("1.2.3"))
+  assert_false(dictionary.check("1a"))
+  assert_true(dictionary.check("foo"))
+}
+
+///|
+test "numbers are only recognised where WORDCHARS declares the separator" {
+  let aff =
+    #|SET UTF-8
+    #|WORDCHARS .
+    #|BREAK 0
+  let dic =
+    #|1
+    #|foo
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("1"))
+  assert_true(dictionary.check("1.5"))
+  // `,` and `-` are not declared among the word characters
+  assert_false(dictionary.check("1,5"))
+  assert_false(dictionary.check("1-5"))
+}
+
+///|
+test "a line of whitespace-separated correct words is correct" {
+  let aff =
+    #|SET UTF-8
+  let dic =
+    #|3
+    #|drink
+    #|eat
+    #|able
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("drink eat"))
+  assert_true(dictionary.check("drink   eat\table"))
+  assert_false(dictionary.check("drink sleep"))
+  assert_false(dictionary.check("drink eat sleep"))
+}
+
+///|
+test "BREAK splits a word at the declared break points" {
+  let aff =
+    #|SET UTF-8
+    #|FORBIDDENWORD !
+    #|BREAK 1
+    #|BREAK -
+    #|WORDCHARS -
+  let dic =
+    #|4
+    #|foo
+    #|bar
+    #|baz
+    #|foo-bar/!
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("foo-bar-baz"))
+  assert_true(dictionary.check("baz-foo"))
+  // a FORBIDDENWORD entry still wins over the break
+  assert_false(dictionary.check("foo-bar"))
+  // with an explicit BREAK list the default `^-` and `-$` are gone
+  assert_false(dictionary.check("-foo"))
+  assert_false(dictionary.check("foo-"))
+}
+
+///|
+test "the default break points are -, ^- and -$" {
+  let aff =
+    #|SET UTF-8
+    #|WORDCHARS -
+  let dic =
+    #|2
+    #|foo
+    #|bar
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("foo-bar"))
+  assert_true(dictionary.check("foo-bar-foo-bar"))
+  assert_true(dictionary.check("-foo"))
+  assert_true(dictionary.check("foo-"))
+  assert_false(dictionary.check("-"))
+  assert_false(dictionary.check("foo-baz"))
+}
+
+///|
+test "BREAK 0 switches word breaking off" {
+  let aff =
+    #|SET UTF-8
+    #|WORDCHARS -
+    #|BREAK 0
+  let dic =
+    #|2
+    #|foo
+    #|bar
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("foo-bar"))
+  assert_false(dictionary.check("-foo"))
+  assert_false(dictionary.check("foo-"))
 }
 
 ///|
