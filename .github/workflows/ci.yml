@@ -15,11 +15,29 @@ jobs:
 
       - name: Install MoonBit toolchain
         run: |
-          curl -fsSL https://cli.moonbitlang.cn/install/unix.sh | bash
+          set -uo pipefail
+          for attempt in 1 2 3; do
+            echo "::group::install attempt $attempt"
+            if curl -fsSL https://cli.moonbitlang.cn/install/unix.sh | bash; then
+              if [ -x "$HOME/.moon/bin/moon" ]; then
+                echo "toolchain installed"
+                echo "::endgroup::"
+                break
+              fi
+            fi
+            echo "::endgroup::"
+            echo "attempt $attempt failed"
+            if [ "$attempt" -eq 3 ]; then
+              echo "giving up after 3 attempts" >&2
+              exit 1
+            fi
+            sleep 15
+          done
           echo "$HOME/.moon/bin" >> $GITHUB_PATH
-
-      - name: Show toolchain versions
-        run: moon version --all
+          # Verify in the same step, with an explicit PATH, so a broken install
+          # fails here with a clear message instead of in a later step.
+          export PATH="$HOME/.moon/bin:$PATH"
+          moon version --all
 
       - name: Update dependencies
         run: moon update
