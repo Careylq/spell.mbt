@@ -45,6 +45,9 @@ fn run(args : Array[String]) -> Int {
     print_usage()
     return 2
   }
+  if args[1] == "suggest" {
+    return run_suggest(args)
+  }
   if args[1] != "check" {
     eprintln("spell: unknown subcommand \"\{args[1]}\"")
     print_usage()
@@ -129,6 +132,93 @@ fn run(args : Array[String]) -> Int {
   }
   if !verdicts.is_empty() {
     println(verdicts.join("\n"))
+  }
+  0
+}
+
+///|
+/// Run the `suggest` subcommand.
+///
+/// The dictionary is loaded exactly as the `check` subcommand loads it, then
+/// each non-empty input line is answered with its suggestions joined by `, ` on
+/// one output line. A word with no suggestion still produces a line, and that
+/// line is empty. The input word itself is never among its own suggestions.
+fn run_suggest(args : Array[String]) -> Int {
+  let options = match parse_options(args) {
+    Ok(options) => options
+    Err(message) => {
+      eprintln("spell: \{message}")
+      print_usage()
+      return 2
+    }
+  }
+  let aff_path = match options.aff {
+    Some(path) => path
+    None => {
+      eprintln("spell: --aff is required")
+      print_usage()
+      return 2
+    }
+  }
+  let dic_path = match options.dic {
+    Some(path) => path
+    None => {
+      eprintln("spell: --dic is required")
+      print_usage()
+      return 2
+    }
+  }
+  let aff_bytes = match read_bytes(aff_path) {
+    Ok(bytes) => bytes
+    Err(message) => {
+      eprintln("spell: \{message}")
+      return 1
+    }
+  }
+  let encoding = sniff_encoding(aff_bytes)
+  let aff_text = strip_bom(decode_bytes(aff_bytes, encoding))
+  let dic_bytes = match read_bytes(dic_path) {
+    Ok(bytes) => bytes
+    Err(message) => {
+      eprintln("spell: \{message}")
+      return 1
+    }
+  }
+  let dic_text = strip_bom(decode_bytes(dic_bytes, encoding))
+  let dictionary = match load_dictionary(aff_text, dic_text) {
+    Ok(dictionary) => dictionary
+    Err(message) => {
+      eprintln("spell: \{message}")
+      return 1
+    }
+  }
+  let words_source = match options.words {
+    Some(source) => source
+    None => "-"
+  }
+  let words_path = if words_source == "-" { "/dev/stdin" } else { words_source }
+  let words_bytes = match read_bytes(words_path) {
+    Ok(bytes) => bytes
+    Err(message) => {
+      eprintln("spell: \{message}")
+      return 1
+    }
+  }
+  let words_text = strip_bom(decode_words(words_bytes, encoding))
+  let lines : Array[String] = []
+  for raw in words_text.split("\n") {
+    let line = match raw.strip_suffix("\r") {
+      Some(view) => view.to_owned()
+      None => raw.to_owned()
+    }
+    if !line.is_empty() {
+      let word = line.trim()
+      let suggestions = @api.suggest(dictionary, word.to_owned(), 15)
+      lines.push(suggestions.join(", "))
+    }
+  }
+  if !lines.is_empty() {
+    println(lines.join("\n"))
   }
   0
 }
@@ -373,4 +463,8 @@ fn print_usage() -> Unit {
   )
   eprintln("  --words -  read one word per line from stdin (the default)")
   eprintln("  prints one line per input word: 1 = correct, 0 = incorrect")
+  eprintln(
+    "usage: spell suggest --aff <file.aff> --dic <file.dic> [--words <file>|-]",
+  )
+  eprintln("  prints one line per input word: its suggestions joined by \", \"")
 }

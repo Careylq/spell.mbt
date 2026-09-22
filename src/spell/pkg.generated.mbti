@@ -33,6 +33,10 @@ pub struct Dictionary {
   compound_rules : Array[String]
   compound_min : Int
   word_chars : String
+  try_chars : String
+  keyboard : String
+  replacements : Array[@aff.Replacement]
+  nosuggest : String?
   ignore_chars : Array[Char]
   check_sharps : Bool
   break_patterns : Array[String]
@@ -45,7 +49,12 @@ pub fn Dictionary::encoding(Self) -> String
 pub fn Dictionary::entry_count(Self) -> Int
 pub fn Dictionary::flag_type(Self) -> @aff.FlagType
 pub fn Dictionary::from_text(String, String) -> Self raise SpellError
+pub fn Dictionary::is_no_suggest(Self, String) -> Bool
+pub fn Dictionary::keyboard(Self) -> String
+pub fn Dictionary::replacements(Self) -> Array[@aff.Replacement]
 pub fn Dictionary::rule_count(Self) -> Int
+pub fn Dictionary::try_chars(Self) -> String
+pub fn Dictionary::word_chars(Self) -> String
 
 pub struct SpellRule {
   rule : @aff.AffixRule

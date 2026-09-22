@@ -246,6 +246,33 @@ pub using @spell { type Dictionary, type SpellError, load, check }
   warning 0051 `ambiguous_precedence`。
 - 必须写 `((mask >> p) & 1) == 1`。**只要 `&` 和 `==` 同现，就加括号。**
 
+## 30. 🔴 一个 `moon.pkg` 里 `for "test"` import 块只能有一个
+
+- **症状**：`moon check` 直接失败在「构建计划」阶段，报
+  `Unable to read moon.pkg ... Duplicate key 'test-import' found in moon.pkg.`
+  （不是普通的语法/类型诊断，而是整个模块发现失败。）
+- **触发**：给测试新增依赖时，又在文件末尾写了一个 `import { ... } for "test"`。
+  第 10 条说的是"主 import 块不覆盖测试包"，**不是**"可以写多块"。
+- **正确写法**：并进已有的 `for "test"` 块；`for "wbtest"` 同理。
+- 实测：`src/suggest/moon.pkg` 一开始同时有主块 + 两块 `for "test"`，就是这个错误。
+
+## 31. `Array::sort_by` 的比较器返回 `Int`，且**不稳定**；`String` 自带 `compare`
+
+- 签名：`pub fn[T] Array::sort_by(Self[T], (T, T) -> Int) -> Unit`，
+  返回负数表示 `a` 在前（与 core 测试里的 `a.compare(b)` 一致）。
+- **不稳定**：相等元素的相对顺序不保证。要确定性输出，比较器必须是**全序**，
+  例如最后用 `a.word.compare(b.word)` 兜底。`String` 实现了 `Compare`，
+  所以 `"a".compare("b")` 可直接用，不需要手写逐字符比较。
+- 本次建议引擎就靠"排名键 + 字典序兜底"保证同一输入每次输出一致。
+
+## 32. 顶层 `const` 可用，`match` 的 `let` 绑定可以 shadowing
+
+- `const MAX_EDIT_LEN : Int = 32` 在包顶层合法（core 里大量使用；
+  `let` 也行，但 `const` 语义更准确）。
+- `let (body, at_end) = match body { Some(r) => (r.to_owned(), true), None => (body, false) }`
+  这种**先绑定再在同一条 `let` 里复用同名变量**是允许的，解析器不会混淆。
+- 这两条都不是坑，而是"AI 常以为不行、实际可以"的写法，记下来省一次试错。
+
 ---
 
 ## 附二：实现过程中被测试抓出来的两个真 bug（值得记住）

@@ -73,3 +73,17 @@ pub fn rule_count(dictionary : Dictionary) -> Int {
 pub fn entry_count(dictionary : Dictionary) -> Int {
   dictionary.entry_count()
 }
+
+///|
+/// Suggestions for a misspelled `word`, best first and at most `limit`.
+///
+/// A word that `check` accepts needs no correction, so the result is empty.
+/// Every returned candidate is a word `check` accepts. See
+/// `@suggest.suggest` for the candidate sources and the ranking.
+pub fn suggest(
+  dictionary : Dictionary,
+  word : String,
+  limit : Int,
+) -> Array[String] {
+  @suggest.suggest(dictionary, word, limit)
+}

@@ -8,4 +8,5 @@
 import {
   "Careylq/spell/src/aff",
   "Careylq/spell/src/spell",
+  "Careylq/spell/src/suggest",
 }

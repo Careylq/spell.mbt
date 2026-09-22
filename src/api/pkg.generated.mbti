@@ -18,6 +18,8 @@ pub fn load(String, String) -> @spell.Dictionary raise @spell.SpellError
 
 pub fn rule_count(@spell.Dictionary) -> Int
 
+pub fn suggest(@spell.Dictionary, String, Int) -> Array[String]
+
 // Errors
 
 // Types and methods

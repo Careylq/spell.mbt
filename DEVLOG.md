@@ -309,4 +309,92 @@ moon run examples/basic   → 正常运行并打印可人工核对的判定表
 
 ---
 
+## 2026-09-22 · Day 3 — 建议引擎 `suggest()` 与 `.sug` 符合率
+
+**做了什么**
+- 新增 `src/suggest/` 包：`pub fn suggest(dict : @spell.Dictionary, word : String, limit : Int) -> Array[String]`。
+- 为 `Dictionary` 增加只读访问器（建议引擎需要、判定引擎本来就有但没暴露的数据）：
+  `try_chars`、`keyboard`、`word_chars`、`replacements`、`is_no_suggest`，
+  并把 `TRY`/`KEY`/`REP`/`NOSUGGEST` 四个字段真正存进 `Dictionary`。
+- `src/api` 增加 `suggest` 并用模块根 `pub using` 再导出。
+- `cmd/main` 增加 `suggest` 子命令（逐行输出 `, ` 连接的建议，无建议输出空行）；
+  `check` 子命令**一行未动**。
+- 新增 `conformance/suggest.sh`（**加法式**，不碰 `run.sh` 的 `.good`/`.wrong` 计算）。
+- 新增 15 个测试（9 个黑盒 + 6 个白盒）。
+
+**建议引擎实际实现了什么（照 Hunspell 手册的算法）**
+1. `REP` 替换：每处出现都替换，`^`/`$` 锚点、`_` 当空格，原文与全小写各跑一遍
+   （`phorm→form`、`alot→a lot`、`Ijs→IJs`）。
+2. 编辑距离 1：删除、相邻换位、替换、插入；替换/插入只在 `TRY` 字符集里做
+   （没有 `TRY` 时退化为 a–z）。这一条是主要的成本控制。
+3. 大小写变体：全小写、首字母大写、全大写；再加上**所有格词干**
+   （`Unicef's→UNICEF's`）和 `CHECKSHARPS` 的 `ß→SS`（`MÜßIG→MÜSSIG`）。
+4. 拆成两个词；`TRY` 或 `WORDCHARS` 含 `-` 时同时给出连字符形式
+   （`rottenday→rotten day, rotten-day`）。
+5. **有界**编辑距离 2：双删除、长换位、单字符移动、两个独立相邻换位。
+   是 O(n²) 而不是 O(n²·|TRY|²)——手册点名的几种方法，不是完整距离 2。
+6. 排序：`REP` 最前 → `KEY` 键盘相邻 → `TRY` 位置靠前 → 距离短 → 字典序兜底；
+   全部去重，绝不返回输入词本身，候选必须被 `check` 接受且不是 `NOSUGGEST`。
+
+**`.sug` 度量（真实跑出来的数字）**
+- 语料 37 个 `.sug`，其中非空期望行共 **173** 行。
+- `.sug` 的格式先读清楚了：它是 `hunspell -a` 输出里 `&` 开头的行的**后段**
+  （按 `: ` 切掉 `& 原词 计数 偏移`），而且**只保留有建议的词**——没建议的词整行被
+  `grep '^&'` 过滤掉了。所以 `.sug` 行号和 `.wrong` 行号**不能按位置一一对应**
+  （`rep` 是 11 个错词只剩 8 行，`checksharps` 是 2 剩 1）。
+- 因此不能用「第 i 行配第 i 个错词」。我采用的判据：把每个 `.sug` 行的
+  **第一个（最佳）建议**，与「某个错词返回的建议列表」做**保序最大配对**
+  （动态规划，每个期望行至多用一次、错词顺序递增）。命中 = 该建议出现在该词的建议里。
+- **结果：108/173 = 62.4%**。
+- 另外两个口径一并记录（README 里也写了）：
+  严格「我们的第一条就是期望的第一条」= **93/173 = 53.8%**；
+  完整复现整个 `.sug` 文件（Hunspell 自己的判据）= **5/37 套**。
+- 没通过的 65 行里，21 行是 `PHONE`/`ph:` 音似表（`ph`/`ph2`/`phone`）、
+  6 行 `MAP` 重音、3 行 `OCONV`、2 行 `FORCEUCASE` 驱动的建议，
+  其余是 ngram/`MAXNGRAMSUGS` 与两处以上的任意编辑。这些本轮**明确不做**，README 已点名。
+
+**没有回归（每次改动都重跑）**
+```
+moon check                                  → 0 errors, 0 warnings
+moon test --target all                      → 118/118 通过（wasm / wasm-gc / js / native）
+bash conformance/run.sh                     → .good 718/848 (84.7%)  .wrong 579/613 (94.5%)
+bash conformance/suggest.sh                 → .sug 最佳建议 108/173 (62.4%)
+```
+`.good`/`.wrong` 与任务给的基线**逐位相同**。判定逻辑一行没改，`suggest` 只加只读访问器。
+
+**性能（自己构造的大词典实测，不是拍脑袋）**
+- 20k 词、26 后缀 + 12 前缀全 cross-product（312 个组合）、`TRY` 26 个字母：
+  1000 个错词 **7.4s**（含 `moon run` 启动）。
+- 同一份词典单跑 `check` 1000 词约 0.08s。也就是说建议是判定的 ~100 倍开销，
+  这是"每个候选都真的跑一次 `check`"的必然结果。
+- 极端构造（100 前缀 × 100 后缀全 cross = 10000 组合）下会到 ~150ms/词——
+  此时瓶颈是 `check` 的 cross-product 反查，不是距离 2。距离 2 只占候选数的约 1/4，
+  去掉也救不了这种词典，所以保留但限制长度（≤20）。
+- 长词保护：`> 32` 字符不做距离 1，`> 20` 字符不做距离 2；
+  `timelimit` 套件的 70+ 字符词 0.4s 内返回且不挂。**语料测量里没有超时。**
+
+**一个测量脚本自己的坑（值得记）**
+- bash 的 `$(...)` 会**吃掉结尾的所有空行**。建议输出的"无建议"是空行，
+  如果空行在末尾就会被吞掉，导致探针以为 CLI 坏了。
+- 修法：探针故意把"有建议的词"放在最后一行（`phorm / zzzz / helo`），
+  这样中间的空行不会被吞。
+- `.sug` 的编码也不能想当然：`1463589.aff` 没有 `SET`（默认 Latin-1），
+  但 `.sug`/`.wrong` 其实是 UTF-8。脚本按 CLI 的 `decode_words` 规则解码
+  （有效 UTF-8 优先，否则用字典编码），否则会拿乱码去比对。
+
+**本日新增的 MoonBit 坑（已补进 `docs/MOONBIT_GOTCHAS.md`）**
+1. `moon.pkg` 里 `for "test"` 的 import 块**只能有一块**，写两块会直接
+   `Duplicate key 'test-import'` 整个构建计划失败（第 10 条的延伸）。
+2. `Array::sort_by` 的比较器返回 `Int`（负数在前）且**不稳定**；要确定性必须自己
+   用字典序兜底。`String` 实现了 `Compare`，`a.compare(b)` 可直接用。
+3. 顶层 `const` 合法；`let (x, y) = match x { ... }` 这种同名 shadowing 也合法
+   ——这两条是"以为不行其实行"的正向记录。
+
+**AI 使用方式（本日）**
+- 仍然是"AI 打字、编译器判定 + 语料判定"。先读语料和手册确定算法，再写代码，
+  每加一个特性就 `moon check` + `moon test` + 重跑 `.sug`，最后重跑 `.good`/`.wrong` 护栏。
+- 排序口径、距离 2 的口径、`.sug` 的判据都写进了 README，避免读者高估数字。
+
+---
+
 ## 待续

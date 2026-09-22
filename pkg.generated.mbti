@@ -14,6 +14,8 @@ pub fn load(String, String) -> @Careylq/spell/src/spell.Dictionary raise @Careyl
 
 pub fn rule_count(@Careylq/spell/src/spell.Dictionary) -> Int
 
+pub fn suggest(@Careylq/spell/src/spell.Dictionary, String, Int) -> Array[String]
+
 // Errors
 
 // Types and methods

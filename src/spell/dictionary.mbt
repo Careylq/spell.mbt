@@ -58,6 +58,17 @@ pub struct Dictionary {
   /// `WORDCHARS`: characters that may appear inside a word. Only the trailing
   /// `.` (abbreviations such as `etc.`) is acted on today.
   word_chars : String
+  /// `TRY`: the characters the suggestion engine may substitute or insert.
+  /// Empty when the `.aff` had no `TRY` line.
+  try_chars : String
+  /// `KEY`: the keyboard layout, one row per `|`-separated group. Empty when the
+  /// `.aff` had no `KEY` line. Used only to rank suggestions.
+  keyboard : String
+  /// `REP`: the replacement pairs, in source order. `_` still stands for a space
+  /// (the parser keeps it verbatim); the suggestion engine interprets it.
+  replacements : Array[@aff.Replacement]
+  /// `NOSUGGEST`: a word carrying this flag is never offered as a suggestion.
+  nosuggest : String?
   /// The characters listed by the `IGNORE` directive, as code points. They are
   /// removed from dictionary entries, affix `strip`/`add` text and checked
   /// words before any comparison (`remove_ignored`).
@@ -163,6 +174,10 @@ pub fn Dictionary::from_text(
     compound_rules: aff.compound_rules,
     compound_min: aff.compound_min,
     word_chars: aff.word_chars,
+    try_chars: aff.try_chars,
+    keyboard: aff.keyboard,
+    replacements: aff.replacements,
+    nosuggest: special.nosuggest,
     ignore_chars,
     check_sharps: aff.check_sharps,
     break_patterns: if aff.breaks_declared {
@@ -352,4 +367,49 @@ pub fn Dictionary::rule_count(self : Dictionary) -> Int {
 /// How many distinct words the word list holds.
 pub fn Dictionary::entry_count(self : Dictionary) -> Int {
   self.entries.length()
+}
+
+///|
+/// The `TRY` characters the `.aff` file declared, or `""` when it had none.
+///
+/// The suggestion engine substitutes and inserts only these characters (falling
+/// back to a plain ASCII alphabet when the list is empty).
+pub fn Dictionary::try_chars(self : Dictionary) -> String {
+  self.try_chars
+}
+
+///|
+/// The `KEY` keyboard layout, or `""` when the `.aff` file had none.
+///
+/// Rows are separated by `|`; the suggestion engine uses adjacency on this
+/// layout to rank candidates.
+pub fn Dictionary::keyboard(self : Dictionary) -> String {
+  self.keyboard
+}
+
+///|
+/// The `WORDCHARS` characters the `.aff` file declared, or `""` when it had none.
+pub fn Dictionary::word_chars(self : Dictionary) -> String {
+  self.word_chars
+}
+
+///|
+/// The `REP` replacement pairs, in source order.
+///
+/// `_` stands for a space, exactly as it does in the file; the suggestion engine
+/// is what interprets it.
+pub fn Dictionary::replacements(self : Dictionary) -> Array[@aff.Replacement] {
+  self.replacements
+}
+
+///|
+/// Is `word` itself marked `NOSUGGEST`, so that it must never be offered as a
+/// suggestion? Only a direct `.dic` entry is considered.
+pub fn Dictionary::is_no_suggest(self : Dictionary, word : String) -> Bool {
+  for flags in self.homonyms(word) {
+    if has_flag(self.nosuggest, flags) {
+      return true
+    }
+  }
+  false
 }

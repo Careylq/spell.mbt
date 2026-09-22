@@ -1,0 +1,13 @@
+// Package `suggest` turns a wrong word into ranked spelling suggestions.
+//
+// Clean-room implementation of the suggestion algorithms described in the
+// Hunspell manual. No Hunspell (LGPL-2.1) source code was consulted or copied;
+// this project is Apache-2.0.
+import {
+  "Careylq/spell/src/spell",
+  "moonbitlang/x/unicode",
+}
+
+import {
+  "Careylq/spell/src/spell",
+} for "test"

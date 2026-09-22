@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Careylq/spell/src/suggest"
+
+import {
+  "Careylq/spell/src/spell",
+}
+
+// Values
+pub fn suggest(@spell.Dictionary, String, Int) -> Array[String]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

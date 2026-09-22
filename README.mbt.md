@@ -4,16 +4,18 @@
 
 A pure-MoonBit spell checker compatible with the **Hunspell `.aff` / `.dic` dictionary
 format** — it parses real-world dictionaries (e.g. `en_US`), applies the affix rules
-defined in the `.aff` file, and judges words the way Hunspell does.
+defined in the `.aff` file, judges words the way Hunspell does, and suggests corrections
+for the words it rejects.
 
 > This file is `README.mbt.md` — MoonBit type-checks `.mbt.md` files, so any MoonBit
 > code block below is verified by `moon check`. `README.md` is a symlink to this file
 > so that GitHub renders it.
 
-> **Status: 0.3.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
-> judgement engine, the public API and the `check` CLI are implemented and tested on
-> all four backends. Suggestion generation (`suggest()`) is **not** implemented — see
-> [Not implemented yet](#not-implemented-yet).
+> **Status: 0.4.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
+> judgement engine, the suggestion engine, the public API and the `check` /
+> `suggest` CLI subcommands are implemented and tested on all four backends. See
+> [Not implemented yet](#not-implemented-yet) for what suggestion generation
+> still leaves out (phonetic/ngram candidates in particular).
 
 ## Conformance
 
@@ -27,7 +29,30 @@ actual run of the harness, not an estimate.
 |---|---|---|---|
 | `.good` (must be accepted) | 718 | 848 | 84.7% |
 | `.wrong` (must be rejected) | 579 | 613 | 94.5% |
-| `.sug` (expected suggestions) | not implemented | 37 files | out of scope for v1 |
+| `.sug` (expected best suggestion produced) | 108 | 173 | 62.4% |
+
+The `.sug` row is measured by `bash conformance/suggest.sh`, which is **additive** and
+never touches the `.good`/`.wrong` computation. A `.sug` line holds the suggestions
+Hunspell produced for one misspelled word, best first, joined by `, `; the corpus files
+are generated from `.wrong` with the words that produced **no** suggestion omitted, so a
+line-by-line positional pairing is impossible. Exactly what was counted:
+
+* **Total** = every non-empty `.sug` line (173 across the 37 `.sug` files).
+* **Passing** = the line's **first** (best) suggestion occurs somewhere in the
+  suggestion list this library returned for some wrong word, matched to a **distinct**
+  wrong word in input order (a maximum monotone matching, so each expected line is used
+  at most once and ordering is respected). Ranking within our list is therefore not
+  required to pass this row. 108/173 = 62.4%.
+* For reference, the stricter "our first suggestion equals the expected best
+  suggestion" is 93/173 = 53.8%, and reproducing a whole `.sug` file exactly —
+  Hunspell's own test criterion, in order and with no extra suggestion — holds for
+  **5/37 suites** (13.5%).
+
+The row is partial because Hunspell's extra suggestion passes are deliberately out of
+scope: the phonetic `ph:`/`PHONE` tables (`ph`, `ph2`, `phone`, 21 of the 65 misses),
+`MAP` accents (`map`/`maputf`, 6), `OCONV` (`oconv`, 3), `FORCEUCASE` (`forceucase`, 2)
+and the ngram/`MAXNGRAMSUGS` candidate generator. Where the corpus needs those the
+library returns fewer (or no) suggestions; it never invents one `check` rejects.
 
 The remaining `.good` gap is dominated by the compound engines this release still
 leaves partial: `COMPOUNDMIDDLE`, `CHECKCOMPOUNDPATTERN`, affixed parts inside
@@ -80,6 +105,22 @@ test {
 `load` raises `SpellError` when either text is malformed; when reading files, prefer
 `moon run cmd/main` (below), which reports the failing file and line on stderr.
 
+Once a word is judged wrong, `suggest` returns the corrections `check` itself accepts,
+best first:
+
+```mbt check
+///|
+test {
+  let dictionary = @spell.load(
+    "SET UTF-8\nTRY abcdefghijklmnopqrstuvwxyz\nREP 1\nREP ph f", "3\nform\nhello\nphantom",
+  )
+  assert_true(@spell.check(dictionary, "form"))
+  assert_eq(@spell.suggest(dictionary, "phorm", 5), ["form"])
+  // a correct word needs no correction
+  assert_eq(@spell.suggest(dictionary, "hello", 5), [])
+}
+```
+
 ### Command line
 
 ```bash
@@ -93,6 +134,17 @@ moon run cmd/main -- check --aff en_US.aff --dic en_US.dic --words -
 * The dictionary is parsed and indexed **once**, then every word is checked against it.
 * If the `.aff` or `.dic` cannot be read or parsed the command prints a message on
   stderr and exits non-zero — it never silently prints `0`s.
+
+The suggestion engine has its own subcommand, with the same file and encoding handling:
+
+```bash
+moon run cmd/main -- suggest --aff en_US.aff --dic en_US.dic --words -
+```
+
+* One line per non-empty input word, holding its suggestions joined by `, ` (an empty
+  line when there is none), in input order.
+* The input word itself is never among its suggestions, and every suggestion is a word
+  `check` accepts.
 
 ### Runnable example
 
@@ -167,8 +219,26 @@ list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`
   (the eight code points that differ from Latin-1) and other single-byte encodings as
   Latin-1. A UTF-8 input file next to a legacy-encoded dictionary is detected and decoded
   as UTF-8, and a leading UTF-8 BOM is stripped.
+- **`suggest()` suggestion engine** (`src/suggest`):
+  * a correct word (`check` accepts it) needs no correction, so the result is empty;
+  * **`REP` replacements** from the `.aff`, applied at every occurrence, on the word and
+    its lower-case form, with `^`/`$` anchors and `_` as a space (`phorm` → `form`,
+    `alot` → `a lot`);
+  * **edit distance 1** — deletions, adjacent transpositions, replacements and insertions,
+    with replacements/insertions restricted to the `TRY` characters (an ASCII alphabet when
+    `TRY` is absent);
+  * **case variations** — lower-case, `Capitalised`, ALL CAPS, the possessive stem
+    (`Unicef's` → `UNICEF's`) and the `CHECKSHARPS` `SS` spelling (`MÜßIG` → `MÜSSIG`);
+  * **splitting into two words**, and with a hyphen when `TRY`/`WORDCHARS` declares `-`;
+  * a **bounded edit distance 2**: double deletion, long swap, single-character move and
+    two independent adjacent transpositions — the kinds the manual names, O(n²) rather
+    than O(n²·|TRY|²), so it stays cheap;
+  * **ranking and filtering** — every candidate must be accepted by `check` and must not be
+    a `NOSUGGEST` entry; results are deduplicated, the input word is never returned, and
+    `REP` hits rank first, then keyboard-adjacent (via `KEY`) typos, then early `TRY`
+    characters, then shorter edit distance, with an alphabetical tiebreak.
 - **Public façade** — `src/api` plus a re-export from the module root: `load`, `check`,
-  `encoding`, `flag_type_name`, `rule_count`, `entry_count`.
+  `suggest`, `encoding`, `flag_type_name`, `rule_count`, `entry_count`.
 - **Runnable example** in `examples/basic`.
 
 **Build status:** `moon check` reports 0 errors and 0 warnings; the test suite passes on
@@ -186,13 +256,18 @@ each of wasm, wasm-gc, js and native.
 - **`COMPLEXPREFIXES`** (twofold prefix stripping, needed by `alias3` and
   `complexprefixes*`).
 - **`ICONV`/`OCONV`** conversion tables — parsed but not applied, so the `iconv*`/
-  `oconv*` suites lose words. `MAP` only participates in suggestion generation.
-- **`FORCEUCASE`** and `NOSUGGEST` semantics at lookup time (both are parsed).
+  `oconv*` suites lose words.
+- **`FORCEUCASE`** and `NOSUGGEST` semantics at lookup time (both are parsed; `NOSUGGEST`
+  is honoured when filtering suggestion candidates).
 - **`FULLSTRIP`, `PSEUDOROOT` and `COMPOUNDROOT`** handling.
 - **Unicode upper-casing** — lowercasing uses `moonbitlang/x/unicode`, but upper-casing
   is ASCII-only, so a non-ASCII first letter is not capitalised (`dotless_i` and the
   Turkish/Azeri casing rules). `CHECKSHARPS` covers German `ß` explicitly.
-- **Suggestion generation** (`suggest()`), and therefore the `.sug` corpus.
+- **Suggestion quality beyond the implemented passes** — the phonetic `PHONE`/`ph:` tables
+  and `MAP` accents are not used, `OCONV` is not applied, `FORCEUCASE` does not drive a
+  suggestion, and there is no ngram/`MAXNGRAMSUGS` candidate generator. Edit distance 2 is
+  only the bounded O(n²) subset listed above (no two arbitrary replacements, no
+  replacement-plus-insertion). This is why `.sug` is at 62.4% rather than higher.
 - FFI bindings to the Hunspell C++ library (this is a pure MoonBit implementation).
 - Any UI / editor plugin.
 
@@ -203,10 +278,11 @@ src/aff/      .aff lexer + parser -> typed AST
 src/dic/      .dic parser + dictionary storage
 src/affix/    affix rule engine (condition matching, strip/add)
 src/spell/    spell() judgement: indexed dictionary, reverse lookup, case rules
-src/api/      public facade: load, check, metadata
-cmd/main/     CLI (the `check` subcommand)
+src/suggest/  suggest(): REP, edit distance 1/2, case, splitting, ranking
+src/api/      public facade: load, check, suggest, metadata
+cmd/main/     CLI (the `check` and `suggest` subcommands)
 examples/     runnable examples
-conformance/  conformance harness against the Hunspell corpus
+conformance/  conformance harnesses (`run.sh` for .good/.wrong, `suggest.sh` for .sug)
 ```
 
 ## Development
