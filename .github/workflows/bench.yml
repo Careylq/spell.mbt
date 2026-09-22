@@ -1,0 +1,71 @@
+# bench.yml — manual-only performance benchmark.
+#
+# This workflow is deliberately NOT triggered by push or pull_request. Benchmark
+# numbers on shared CI runners are noisy (variable CPU, neighbours, throttling)
+# and must never gate a build. It exists so that a maintainer can run the same
+# one-command benchmark on a clean machine and read the table in the job log.
+#
+# Run it from the Actions tab ("Run workflow"), or:
+#   gh workflow run bench.yml
+#
+# The numbers this produces are only meaningful next to the machine description
+# that bench/run.sh prints at the top of the log. The reference numbers in
+# README.mbt.md were measured on an Apple M5 laptop, not on a CI runner.
+#
+# The `ci.yml` gate is untouched: check / build / test remain the blocking checks.
+
+name: Benchmark
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install MoonBit toolchain
+        run: |
+          set -uo pipefail
+          for attempt in 1 2 3; do
+            echo "::group::install attempt $attempt"
+            if curl -fsSL https://cli.moonbitlang.cn/install/unix.sh | bash; then
+              if [ -x "$HOME/.moon/bin/moon" ]; then
+                echo "toolchain installed"
+                echo "::endgroup::"
+                break
+              fi
+            fi
+            echo "::endgroup::"
+            echo "attempt $attempt failed"
+            if [ "$attempt" -eq 3 ]; then
+              echo "giving up after 3 attempts" >&2
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.moon/bin:$PATH"
+          moon version --all
+
+      # The head-to-head section is skipped with a clear message when hunspell is
+      # absent, so this step is best-effort and must not fail the job.
+      - name: Install hunspell (best effort, for the head-to-head section)
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq hunspell
+          hunspell -v || true
+
+      - name: Update dependencies
+        run: moon update
+
+      # bench/run.sh fetches the LibreOffice en_US dictionary at run time (never
+      # vendored), generates the synthetic dictionaries, builds all four backends
+      # in release mode and prints every table to stdout.
+      - name: Run benchmark
+        run: bash bench/run.sh

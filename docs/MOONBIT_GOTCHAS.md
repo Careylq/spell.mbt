@@ -275,6 +275,31 @@ pub using @spell { type Dictionary, type SpellError, load, check }
 
 ---
 
+## 33. 🔴 原生后端的 `--words -` 读不了**管道**（wasm 后端可以）
+
+- **背景**：CLI 的 `--words -` 约定从 stdin 逐行读词（见 `conformance/README.md`）。
+  实现是把 `"/dev/stdin"` 交给 `@fs.read_file_to_bytes`。
+- **症状**：`printf 'hello\nzzzz\n' | <native-binary> check ... --words -`
+  失败并打印 `spell: cannot read "/dev/stdin": Illegal seek`，退出码 1。
+- **原因**：`read_file_to_bytes` 需要先 seek 到末尾拿到长度。macOS 上
+  `/dev/stdin -> /dev/fd/0`：fd 0 是**管道**时不可 seek；fd 0 是**重定向的普通
+  文件**时可 seek。
+- **后端差异（关键）**：`moon run`（wasm + moonrun）把 `/dev/stdin` 当预打开文件
+  处理，读管道正常；`--target native` 走真实文件系统，因此**只有 native 会失败**。
+  同一段命令在两个后端行为不同，很容易在本地（moon run）测过、CI/发布版（native）
+  才炸。
+- **规避**：用 `< file` 重定向（`conformance/run.sh` 就是这么做的），或者直接传
+  `--words <file>`。`bench/run.sh` 一律传显式文件路径，所以不受影响。
+- **实测**（moon 0.1.20260920 / macOS 26.6.2 arm64）：
+
+```bash
+printf 'hello\nzzzz\n' | main.exe check --aff a.aff --dic d.dic --words -   # Illegal seek, rc=1
+main.exe check --aff a.aff --dic d.dic --words - < words.txt              # 1 / 0, rc=0
+printf 'hello\nzzzz\n' | moon run cmd/main -- check --aff a.aff --dic d.dic --words -   # 1 / 0, rc=0
+```
+
+---
+
 ## 附二：实现过程中被测试抓出来的两个真 bug（值得记住）
 
 这两条是**语义性错误**，不是语法错误——编译器不会报，只有测试能抓：
