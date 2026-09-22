@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install MoonBit toolchain
+        run: |
+          curl -fsSL https://cli.moonbitlang.cn/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: Show toolchain versions
+        run: moon version --all
+
+      - name: Update dependencies
+        run: moon update
+
+      # --- Acceptance requirement: CI must cover check / build / test ---
+
+      - name: moon check
+        run: moon check
+
+      - name: moon build
+        run: moon build
+
+      - name: moon test
+        run: moon test
+
+      # --- Cross-backend evidence (wasm / js) ---
+
+      - name: moon check --target wasm
+        run: moon check --target wasm
+
+      - name: moon build --target js
+        run: moon build --target js
+
+      # --- Conformance dashboard against the official Hunspell test corpus ---
+      # The corpus is NOT vendored (Hunspell is LGPL-2.1); it is cloned into a
+      # temp dir at CI time only. See conformance/README.md.
+      - name: Conformance report
+        run: |
+          if [ -f conformance/run.sh ]; then
+            bash conformance/run.sh
+          else
+            echo "conformance harness not implemented yet"
+          fi
