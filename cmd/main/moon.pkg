@@ -1,5 +1,5 @@
 // import {
-//   "YOURNAME/spell" @lib,
+//   "Careylq/spell/src/api" @api,
 // }
 
 pkgtype(kind: "executable")

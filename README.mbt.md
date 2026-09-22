@@ -1,6 +1,6 @@
 # spell.mbt
 
-[![CI](https://github.com/YOURNAME/spell.mbt/actions/workflows/ci.yml/badge.svg)](https://github.com/YOURNAME/spell.mbt/actions/workflows/ci.yml)
+[![CI](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml/badge.svg)](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml)
 
 A pure-MoonBit spell checker compatible with the **Hunspell `.aff` / `.dic` dictionary
 format**. Parses real-world dictionaries (e.g. `en_US`) and performs morphological
@@ -39,7 +39,7 @@ problems (`moonlexicon` is multi-pattern string matching; `moonnlp` and
 ## Install
 
 ```bash
-moon add YOURNAME/spell
+moon add Careylq/spell
 ```
 
 ## Quick start

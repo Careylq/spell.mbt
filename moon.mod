@@ -9,26 +9,19 @@
 //   "moonbitlang/x@0.4.6",
 // }
 
-name = "YOURNAME/spell"
+name = "Careylq/spell"
 
 version = "0.1.0"
 
 readme = "README.mbt.md"
 
-// TODO(day 2): fill in the real GitHub URL, e.g.
-// repository = "https://github.com/<你的GitHub用户名>/spell.mbt"
-repository = ""
+// NOTE: the namespace must match your mooncakes.io account for `moon publish`.
+// Run `moon register` / `moon login` first; `moon whoami` shows the effective user.
+repository = "https://github.com/Careylq/spell.mbt"
 
 license = "Apache-2.0"
 
-keywords = [
-  "spellcheck",
-  "hunspell",
-  "dictionary",
-  "affix",
-  "text",
-  "nlp",
-]
+keywords = [ "spellcheck", "hunspell", "dictionary", "affix", "text", "nlp" ]
 
 preferred_target = "wasm"
 
