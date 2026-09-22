@@ -11,13 +11,13 @@
 | 4 | 提供 **README**：项目目标 / 安装方式 / 使用方法 / 示例 / **可复现** | ✅ | `README.mbt.md`（`README.md` 为其符号链接）；含 Quick start、CLI 用法、可复现步骤 |
 | 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | `.github/workflows/ci.yml` → `moon check` / `moon build` / `moon test` + 跨后端构建 |
 | 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ | `examples/basic`（`moon run examples/basic` 可直接运行，输出判定结果） |
-| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **80 个测试**，四个后端全部通过；另有符合率框架 `conformance/` |
-| 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.2.0`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
+| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **102 个测试**，四个后端全部通过；另有符合率框架 `conformance/` |
+| 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.3.0`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
 | 9 | 采用 **OSI 认可的开源许可证** | ✅ | `LICENSE` = Apache-2.0 |
 | 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | `NOTICE`：参考 Hunspell（LGPL-2.1）的**格式规范与可观察行为**，未复制源码；测试语料不随仓库分发 |
 
 **已实测的符合率**（`bash conformance/run.sh`，154 个测试套件）：
-`.good` **459/848 = 54.1%** ｜ `.wrong` **570/613 = 93.0%**
+`.good` **718/848 = 84.7%** ｜ `.wrong` **579/613 = 94.5%**
 未通过的 `.good` 集中在 README「Not implemented yet」中已明确列出的功能（复合词规则、词缀续接 flag、`IGNORE`、`COMPLEXPREFIXES`、完整 Unicode 大小写折叠）。
 
 ## 提交前的最后检查
