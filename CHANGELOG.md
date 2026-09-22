@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
+## [0.4.0] — 2026-09-22
+
+### Added
+- **Suggestion engine** (`src/suggest`): `suggest(dict, word, limit)`, using Hunspell's
+  approach — `REP` substitutions, edit distance 1 restricted to the `TRY` character set,
+  a bounded distance 2, case variants (including the possessive stem and `CHECKSHARPS`),
+  two-word and hyphenated splits — then ranking by `REP`, `KEY` adjacency, `TRY` order,
+  distance and finally alphabetically. Every candidate must pass `check()`; `NOSUGGEST`
+  candidates are filtered and the input word is never returned.
+- `suggest` is reachable from `src/api`, the module root re-export, and a new CLI
+  subcommand: `moon run cmd/main -- suggest --aff <a.aff> --dic <d.dic> --words -`.
+- `conformance/suggest.sh`, an additive measurement of the corpus `.sug` files that does
+  not touch the `.good`/`.wrong` computation. The README defines the metric explicitly,
+  because `.sug` files omit words that produced no suggestion and therefore cannot be
+  paired positionally:
+  - exact `.sug` file reproduced (Hunspell's own criterion): **5/37 suites**
+  - expected best suggestion present, order-aligned: **108/173 = 62.4%**
+  - expected best suggestion is our first: **93/173 = 53.8%**
+- New `Dictionary` accessors: `try_chars`, `keyboard`, `word_chars`, `replacements`,
+  `is_no_suggest`.
+
+Tests grow from 102 to **118**, passing on wasm, wasm-gc, js and native.
+
+### Not implemented (suggestion quality)
+`PHONE`/`ph:`, `MAP`, `OCONV`, `FORCEUCASE`-driven suggestions and ngram generation are
+deliberately out of scope; they account for 65 of the 65 misses. Distance 2 is a bounded
+O(n²) subset, not a complete distance 2.
+
 ## [0.3.0] — 2026-09-22
 
 Conformance work: `.good` rises from **54.1%** to **84.7%**, `.wrong` from **93.0%** to
