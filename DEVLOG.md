@@ -38,4 +38,41 @@
 
 ---
 
+## 2026-09-22 · Day 2 — `.aff` 解析器（第一个功能切片）
+
+**做了什么**
+- 新增 `src/aff/` 包：**`.aff` 文件 → 类型化 AST**。
+- 公开 API：`pub fn parse_aff(String) -> AffFile raise AffParseError`
+- 覆盖的指令：`SET` `FLAG` `AF` `AM` `PFX` `SFX` `REP` `TRY` `KEY` `IGNORE` `WORDCHARS`
+  `COMPOUNDMIN` `COMPOUNDFLAG` `COMPOUNDBEGIN/END/MIDDLE` `COMPOUNDRULE`
+  `CHECKCOMPOUNDDUP/TRIPLE/REPEAT/SIMPLIFIEDTRIPLE/PATTERN` `ONLYINCOMPOUND`
+  `NOSUGGEST` `KEEPCASE` `FORBIDDENWORD` `NEEDAFFIX` `CIRCUMFIX`；
+  其余指令（如 `ICONV`）收进 `unrecognized`（带 name/args/line），不静默丢弃。
+- 报错带**行号**（`AffParseError(line~, message~)`，`Show` 渲染成 `line N: message`）。
+
+**验证结果（我自己复跑过，不是"据说"）**
+```
+moon check                 → 0 errors, 0 warnings
+moon test --target all     → Total tests: 22, passed: 22, failed: 0
+                             [wasm] [wasm-gc] [js] [native] 全部通过
+```
+> 顺带白拿一个季度奖加分项：**四个后端全部构建+测试通过**，这本身就是可写进 README 的证据。
+
+**踩的坑 → 已固化成文档**
+本切片一共撞上 **11 个编译器层面的坑**（`inspect` 已废弃、`unused_mut` 居然是 error 而不是
+warning、`derive(Eq, @debug.Debug)` 触发 0079、带 `raise` 必须写返回类型……）。
+全部记进 `docs/MOONBIT_GOTCHAS.md`。
+
+**为什么这件事很重要**
+LLM 对 MoonBit 的零样本正确率只有 0–1%（IEEE TSE 论文实测），所以"AI 写的 MoonBit
+看着对、编译不过"是常态。这 11 条是**被编译器验证过**的，可直接喂给后续的 AI 迭代，
+避免重复踩坑。这也解释了为什么本项目的铁律是「AI 打字、编译器判定」。
+
+**AI 使用方式（本日）**
+- 由 AI 实现代码，但**每一块都必须通过 `moon check` + `moon test`** 才算完成；
+  期间多次由编译器报错驱动修正，没有接受任何未经编译验证的写法。
+- 最终成果经我独立复跑确认（不是采信 AI 的自我报告）。
+
+---
+
 ## 待续
