@@ -3,16 +3,17 @@
 [![CI](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml/badge.svg)](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml)
 
 A pure-MoonBit spell checker compatible with the **Hunspell `.aff` / `.dic` dictionary
-format**. Parses real-world dictionaries (e.g. `en_US`) and performs morphological
-spell checking using the affix rules defined in the `.aff` file.
+format** — it parses real-world dictionaries (e.g. `en_US`) and applies the affix rules
+defined in the `.aff` file.
 
 > This file is `README.mbt.md` — MoonBit type-checks `.mbt.md` files, so any MoonBit
 > code block below is verified by `moon check`. `README.md` is a symlink to this file
 > so that GitHub renders it.
 
-> **Status: v1 (September round).** This release covers dictionary parsing, the affix
-> rule engine, and `spell()` judgement. The suggestion engine is **not implemented yet**
-> — see [Not implemented](#not-implemented).
+> **Status: 0.1.0 — work in progress.** This release provides the `.aff` and `.dic`
+> parsers plus the affix rule engine. `spell()` judgement, the CLI and the suggestion
+> engine are **not implemented yet** (see [Not implemented yet](#not-implemented-yet)),
+> which is why the conformance numbers below cannot be produced yet.
 
 ## Conformance
 
