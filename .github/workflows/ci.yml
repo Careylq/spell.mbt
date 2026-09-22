@@ -50,8 +50,8 @@ jobs:
       - name: moon build
         run: moon build
 
-      - name: moon test
-        run: moon test
+      - name: moon test (all backends)
+        run: moon test --target all
 
       # --- Cross-backend evidence (wasm / js) ---
 
