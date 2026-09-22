@@ -1,0 +1,13 @@
+// Package `aff` parses Hunspell `.aff` files into a typed AST.
+import {
+  "moonbitlang/core/string",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "moonbitlang/core/debug",
+} for "test"
+
+import {
+  "moonbitlang/core/debug",
+} for "wbtest"

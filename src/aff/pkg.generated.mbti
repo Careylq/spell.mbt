@@ -1,0 +1,98 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "YOURNAME/spell/src/aff"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn parse_aff(String) -> AffFile raise AffParseError
+
+// Errors
+pub(all) suberror AffParseError {
+  AffParseError(line~ : Int, message~ : String)
+} derive(Eq, @debug.Debug)
+pub fn AffParseError::output(Self, &Logger) -> Unit
+pub fn AffParseError::to_string(Self) -> String
+pub impl Show for AffParseError
+
+// Types and methods
+pub(all) struct AffFile {
+  encoding : String
+  flag_type : FlagType
+  affix_headers : Array[AffixHeader]
+  affix_rules : Array[AffixRule]
+  flag_aliases : Array[String]
+  morph_aliases : Array[String]
+  replacements : Array[Replacement]
+  try_chars : String
+  keyboard : String
+  ignore_chars : String
+  word_chars : String
+  compound_min : Int
+  compound_flag : String?
+  compound_begin : String?
+  compound_end : String?
+  compound_middle : String?
+  compound_rules : Array[String]
+  check_compound_dup : Bool
+  check_compound_triple : Bool
+  check_compound_repeat : Bool
+  check_compound_simplified_triple : Bool
+  check_compound_pattern : Array[String]
+  special_flags : SpecialFlags
+  unrecognized : Array[UnknownDirective]
+} derive(Eq, @debug.Debug)
+
+pub(all) struct AffixHeader {
+  kind : AffixKind
+  flag : String
+  cross_product : Bool
+  count : Int
+} derive(Eq, @debug.Debug)
+
+pub(all) enum AffixKind {
+  Prefix
+  Suffix
+} derive(Eq, @debug.Debug)
+
+pub(all) struct AffixRule {
+  kind : AffixKind
+  flag : String
+  cross_product : Bool
+  strip : String
+  add : String
+  condition : String
+  morph : Array[String]
+} derive(Eq, @debug.Debug)
+
+pub(all) enum FlagType {
+  SingleChar
+  Long
+  Num
+  Utf8
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Replacement {
+  from : String
+  to : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct SpecialFlags {
+  nosuggest : String?
+  keepcase : String?
+  forbiddenword : String?
+  needaffix : String?
+  circumfix : String?
+  onlyincompound : String?
+} derive(Eq, @debug.Debug)
+
+pub(all) struct UnknownDirective {
+  name : String
+  args : Array[String]
+  line : Int
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
