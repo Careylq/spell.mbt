@@ -10,7 +10,7 @@ defined in the `.aff` file, and judges words the way Hunspell does.
 > code block below is verified by `moon check`. `README.md` is a symlink to this file
 > so that GitHub renders it.
 
-> **Status: 0.2.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
+> **Status: 0.3.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
 > judgement engine, the public API and the `check` CLI are implemented and tested on
 > all four backends. Suggestion generation (`suggest()`) is **not** implemented — see
 > [Not implemented yet](#not-implemented-yet).
