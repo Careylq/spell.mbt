@@ -1,0 +1,5 @@
+// import {
+//   "YOURNAME/spell" @lib,
+// }
+
+pkgtype(kind: "executable")
