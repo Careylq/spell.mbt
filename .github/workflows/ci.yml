@@ -64,7 +64,12 @@ jobs:
       # --- Conformance dashboard against the official Hunspell test corpus ---
       # The corpus is NOT vendored (Hunspell is LGPL-2.1); it is cloned into a
       # temp dir at CI time only. See conformance/README.md.
+      #
+      # This step is intentionally non-blocking: it clones an external repository
+      # and runs 150+ suites, so a network hiccup upstream must not mark the build
+      # red. The blocking gate for this project is check / build / test above.
       - name: Conformance report
+        continue-on-error: true
         run: |
           if [ -f conformance/run.sh ]; then
             bash conformance/run.sh

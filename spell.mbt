@@ -1,3 +1,17 @@
-// Main package file for your library code.
-// Put public APIs and shared helpers here.
-// Keep blocks small and focused for easy refactors.
+// The module root is the shortest way in: it re-exports the public facade from
+// `src/api`, so `import { "Careylq/spell" }` is enough for a user.
+//
+// Everything here is a re-export — the implementation lives in `src/`.
+
+///|
+/// Load a dictionary from `.aff` + `.dic` text and check words against it.
+pub using @api {
+  type Dictionary,
+  type SpellError,
+  load,
+  check,
+  encoding,
+  flag_type_name,
+  rule_count,
+  entry_count,
+}

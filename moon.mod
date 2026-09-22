@@ -17,6 +17,7 @@ readme = "README.mbt.md"
 
 // NOTE: the namespace must match your mooncakes.io account for `moon publish`.
 // Run `moon register` / `moon login` first; `moon whoami` shows the effective user.
+
 repository = "https://github.com/Careylq/spell.mbt"
 
 license = "Apache-2.0"
@@ -26,3 +27,7 @@ keywords = [ "spellcheck", "hunspell", "dictionary", "affix", "text", "nlp" ]
 preferred_target = "wasm"
 
 description = "Pure-MoonBit spell checker compatible with the Hunspell .aff/.dic dictionary format."
+
+import {
+  "moonbitlang/x@0.5.5",
+}

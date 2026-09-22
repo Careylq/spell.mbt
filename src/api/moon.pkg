@@ -1,0 +1,11 @@
+// Package `api` is the small, documented facade a user should reach for.
+//
+// It exists so that `import { "Careylq/spell" }` (the module root) and
+// `import { "Careylq/spell/src/api" }` present one obvious entry point instead
+// of the four internal packages. Nothing is re-implemented here: the types are
+// re-exported and the two functions are one-line conveniences over
+// `@spell.Dictionary`.
+import {
+  "Careylq/spell/src/aff",
+  "Careylq/spell/src/spell",
+}

@@ -1,5 +1,10 @@
-// import {
-//   "Careylq/spell/src/api" @api,
-// }
+// `spell` command-line front end.
+import {
+  "Careylq/spell/src/api",
+  "moonbitlang/core/env",
+  "moonbitlang/x/fs",
+  "moonbitlang/x/sys",
+  "moonbitlang/x/unicode",
+}
 
 pkgtype(kind: "executable")

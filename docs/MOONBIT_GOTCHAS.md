@@ -143,8 +143,71 @@ moon explain --attribute <NAME>      # 查属性
 
 ## 18. 已知局限（诚实记录）
 
-- `.dic` 开头的 **UTF-8 BOM (U+FEFF)** 未剥离 → 会报 "expected an entry count"。`.aff` 同样未处理 BOM。
+- `.aff` / `.dic` 的 **UTF-8 BOM (U+FEFF)**：`Dictionary::from_text` 与 CLI 现已剥离；
+  直接调用底层 `parse_aff` / `parse_dic` 仍不剥离。
 - `FLAG num` 的值未校验是否为十进制（按规范原样存字符串）。
+- `.dic` 计数行之后的文本（如 `4 # comment`）现已忽略（与 Hunspell 的数值扫描一致）。
+
+---
+
+## 19. 🔴 `fn f(self : T, ...)` 作为自由函数是废弃语法（0027）且会变成方法
+
+- **症状**：写
+  ```moonbit
+  fn lookup(self : Dictionary, word : String) -> Bool { ... }
+  pub fn Dictionary::check(self, word) { lookup(self, word) }
+  ```
+  编译器把 `lookup` 注册成 `Dictionary::lookup`，于是 `lookup(self, word)` 报
+  `4021 The value identifier lookup is unbound`；同一批 9 个函数一次报了 24 个错。
+- **正确写法**（二选一）：
+  1. 写成方法：`fn Dictionary::lookup(self : Dictionary, ...)`，调用 `self.lookup(...)`；
+  2. 首参不要叫 `self`：`fn lookup(dict : Dictionary, ...)`。
+- **注意**：warning 0027 只报一次在定义行，错误却在每个调用点，很容易误判成作用域问题。
+
+## 20. `pub using` 可以再导出类型与函数
+
+```moonbit
+pub using @spell { type Dictionary, type SpellError, load, check }
+```
+- 模块根（`Careylq/spell` 根包的 `spell.mbt`）用它把 `src/api` 的门面转出去，
+  `import { "Careylq/spell" }` 就能 `@spell.load(...)`。
+- `pub struct X { a : Int }`（非 `pub(all)`）在 `pkg.generated.mbti` 里**仍会列出字段**，
+  但外部不能构造；这不是字段泄漏，只是接口描述。
+
+## 21. `.mbt` 的文档注释代码块也会被 `moon check` 类型检查
+
+- `/// ```mbt check` 里的代码在该包的 **blackbox 测试上下文**编译。
+- 因此文档示例里写未限定的本包函数会触发 warning `0025 test_unqualified_package`，
+  要写成 `@api.foo`。README.mbt.md 的代码块同理（它属于根包，所以用 `@spell.` 前缀）。
+- 好处：README 的 Quick start 不会再「文档和代码脱节」——写错就编译失败。
+
+## 22. `moon fmt --check` 与 `moon.mod` 空行（第 15 条的延伸）
+
+- `moon fmt` 会给 `moon.mod` 插一个空行；只要不接受它，`moon fmt --check` 就**必然失败**。
+- 本期选择接受这个空行，于是 `moon fmt --check` 通过。CI 只跑 `moon check/build/test`，
+  不受影响。
+
+## 23. `&` 的优先级低于 `==`
+
+- `b & 0xC0 == 0x80` 被解析成 `b & (0xC0 == 0x80)`，类型检查报
+  `Expr Type Mismatch: has type Int, wanted Bool`。
+- 必须写 `(b & 0xC0) == 0x80`。
+
+## 24. `String` 没有 `ends_with` / `starts_with` / `to_ascii_uppercase`
+
+- 匹配前后缀用 `strip_prefix` / `strip_suffix`（返回 `StringView?`），
+  包含判断用 `contains`；大小写只在 `Char` 上有 `to_ascii_uppercase` / `to_ascii_lowercase`。
+- 大小写折叠的非 ASCII 部分要用 `moonbitlang/x/unicode` 的 `to_lowercase(Char)`
+  （**只有小写方向**，没有 `to_uppercase`）。
+
+## 25. core 没有文件 / stdin API
+
+- 读文件用 `moonbitlang/x/fs`：`read_file_to_bytes` / `read_file_to_string`；
+  需要自己按编码解码时先拿 `Bytes`。
+- 读 stdin 可以直接把 `"/dev/stdin"` 交给 `read_file_to_bytes`（`moon run` 默认 wasm +
+  moonrun 会正常解析这个伪路径；macOS 与 Linux 均可用）。
+- `@env.args()` 第 0 个元素是程序自身路径，用户参数从下标 1 开始；
+  退出码用 `moonbitlang/x/sys` 的 `exit(Int)`（wasm 后端映射到 `proc_exit`）。
 
 ---
 

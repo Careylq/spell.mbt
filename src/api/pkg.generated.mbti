@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Careylq/spell/src/api"
+
+import {
+  "Careylq/spell/src/spell",
+}
+
+// Values
+pub fn check(@spell.Dictionary, String) -> Bool
+
+pub fn encoding(@spell.Dictionary) -> String
+
+pub fn entry_count(@spell.Dictionary) -> Int
+
+pub fn flag_type_name(@spell.Dictionary) -> String
+
+pub fn load(String, String) -> @spell.Dictionary raise @spell.SpellError
+
+pub fn rule_count(@spell.Dictionary) -> Int
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+pub using @spell {type Dictionary}
+
+pub using @spell {type SpellError}
+
+// Traits

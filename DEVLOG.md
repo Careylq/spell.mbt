@@ -122,4 +122,92 @@ moon test  --target all  → 55/55 通过
 
 ---
 
+## 2026-09-22 · Day 3 — `spell()` 判定引擎 + CLI + 公共 API + 可运行示例
+
+**做了什么**
+- `src/spell/`：**判定引擎**（本切片的核心）。
+  - `pub struct Dictionary`（不透明类型）+ `Dictionary::from_text(aff, dic)` + `Dictionary::check(self, word) -> Bool`，
+    外加 `encoding` / `flag_type` / `rule_count` / `entry_count` 四个只读访问器。
+  - **反向查表，不是暴力枚举**：命中词缀派生形式时，从「词」反推词根
+    （后缀去掉 `add` 再把 `strip` 接回去；前缀镜像），再校验词根在词典里、带该 flag、
+    条件成立，最后用 `apply_rule` 重新生成一次做守卫。一次加载建立 `Map[String, Array[String]]` 索引，
+    之后每个词只查表 + 遍历规则，词典只解析一次。
+  - **大小写规则**：全小写 / Capitalised / ALL CAPS / 混合大小写（混合只接受精确匹配）。
+  - **特殊 flag**：`FORBIDDENWORD` / `KEEPCASE` / `NEEDAFFIX` / `ONLYINCOMPOUND` 在查表时生效。
+  - **交叉派生**：同一词根上「一个前缀 + 一个后缀」（两块的 `cross_product = Y`）。
+  - **基础复合词**：恰好拆成两个都带 `COMPOUNDFLAG` 的词典词，各自不短于 `COMPOUNDMIN`（缺省 3）。
+  - `WORDCHARS` 含 `.` 时接受缩写尾点（`etc.`、`HUNSPELL...`）。
+  - **`add` 字段的续接 flag**（`SFX A 0 s/123 .`）在装载时截断成 `s`：第一个词缀要能用；
+    通过 `/` 后面的 flag 再链第二个词缀（twofold suffix stripping）**未实现**，已写进 README 限制。
+- `src/api/`：薄门面（`load` / `check` / `encoding` / `flag_type_name` / `rule_count` / `entry_count`
+  + `pub using` 转出 `Dictionary`、`SpellError`）。模块根 `Careylq/spell` 再转出一次，
+  所以 `import { "Careylq/spell" }` 就是最短入口。
+- `cmd/main/`：`check` 子命令，严格按 `conformance/README.md` 的契约：
+  `--words -` 读 stdin、`--words <file>` 读文件、每个非空输入行输出一行 `1/0`、顺序一致、
+  词典只加载一次。**空行不输出**（与 harness 的 `grep .` 对齐）。
+  读文件/解析失败 → stderr 报错 + 退出码非 0，绝不静默输出 0。
+  另外在 CLI 层做了编码嗅探（见下）。
+- `examples/basic/`：可运行示例（`moon run examples/basic`），内嵌自写的小 `.aff`/`.dic`，
+  打印编码、flag 模式、规则数、词条数与若干判定（含 `cats`/`boxes`/`happied`/`undos` 等派生形式）。
+- `.dic` 解析器顺手修了一个真 bug：**计数行后面的文本要忽略**（Hunspell 用数值扫描，
+  语料里有 `4 # Old Persian numbers`），只取第一个空白分隔字段，错误信息仍引用整行。
+
+**验证结果（我复跑过）**
+```
+moon check --target all   → 0 errors, 0 warnings
+moon test  --target all   → 80/80 通过（wasm / wasm-gc / js / native 四个后端）
+moon fmt --check          → 通过（含 moon.mod；见下）
+CLI 契约                 → printf 'hello\nzzzz\n' | moon run cmd/main -- check --aff p.aff --dic p.dic --words -
+                            输出恰为 1 然后 0，退出码 0
+坏词典                    → 退出码 1，stdout 为空，stderr 有行号与原因
+moon run examples/basic   → 正常运行并打印可人工核对的判定表
+```
+
+**真实符合率（跑了完整语料，不是估的）**
+```
+第一次（只有引擎，无编码/BOM/尾点处理）  good 374/848 = 44.1%   wrong 470/613 = 76.7%
+修复后（编码 + BOM + 尾点 + 续接 flag + 计数行注释 + 输入空白）  good 459/848 = 54.1%   wrong 570/613 = 93.0%
+```
+说明：
+- `wrong` 从 76.7% 涨到 93.0%，一部分是**之前 CLI 在 ISO8859 文件上解析失败、一个字都不输出**，
+  harness 把「缺输出」也算成未拒绝；编码修好后这些套件才真正给出 `0`。
+- 剩下的 `.good` 缺口集中在**明确不做的功能**：`COMPOUNDRULE`/德语复合词、续接 flag
+  （twofold affix）、`IGNORE`、`COMPLEXPREFIXES`、`ß → SS` 这类完整 Unicode 大小写映射。
+  README 的「Not implemented yet」逐条列了，没有含糊。
+
+**CLI 层的编码处理（值得记）**
+- 语料里 `.aff`/`.dic` 有 `ISO8859-1`/`ISO8859-15`（还有无 `SET`、默认 ISO8859-1 的文件），
+  但 `.good` 常是 UTF-8 —— 两种编码混在一起。
+- 做法：先从 `.aff` 字节里嗅探 `SET`（先跳过 UTF-8 BOM），据此解码 `.aff`/`.dic`；
+  词表输入若本身是合法 UTF-8 就按 UTF-8 解，否则回退到词典编码的逐字节解码。
+  ISO8859-15 额外映射与 Latin-1 不同的 8 个码位（€、œ/Œ 等）。BOM 一律剥离。
+- 这一步把 `base`、`encoding`、`utf8_bom`、`utf8_bom2`、`utf8_nonbmp`、`i54980`、`fullstrip`
+  等套件从「整块挂」变成「全过」，其中 `utf8_nonbmp` 还顺带证明了非 BMP 字符是按码点处理的。
+
+**本切片新踩的 MoonBit 坑（已补进 `docs/MOONBIT_GOTCHAS.md`）**
+1. **`fn f(self : T, ...)` 作为自由函数是废弃语法**（warning 0027）：编译器会把它当成
+   `T::f` 方法，于是同一个文件里按 `f(...)` 调用会报 `unbound value`。
+   要么写 `fn T::f(self, ...)` 当方法、用 `self.f(...)` 调，要么把首参改名。
+   我一开始写了 9 个 `fn x(self : Dictionary, ...)`，编译器一次报了 24 个错。
+2. **`pub using @pkg { type X, fn_name }` 可以做再导出**；模块根用它可以给
+   `moon add <模块名>` 一个最短入口。`pub struct`（非 `pub(all)`）在 `.mbti` 里仍会列出字段，
+   但它是不可从外部构造的不透明类型（示例与测试都只通过方法使用）。
+3. **`.mbt` 的文档注释代码块（```mbt check）也会被 `moon check` 类型检查**，
+   而且是在该包的 blackbox 测试上下文里，所以未加 `@本包.` 前缀会触发 warning 0025。
+4. `moon fmt --check` 会因为 `moon.mod` 少一个空行而失败（第 15 条坑的另一种表现）；
+   接受 `moon fmt` 加的那一行后 `moon fmt --check` 反而通过。本期选择让检查通过。
+5. **`&` 的优先级低于 `==`**：`b & 0xC0 == 0x80` 被解析成 `b & (0xC0 == 0x80)`，
+   必须写 `(b & 0xC0) == 0x80`。
+6. `String` 没有 `ends_with` / `starts_with` / `to_ascii_uppercase`；用
+   `strip_prefix` / `strip_suffix`（返回 `StringView?`）和 `contains` 代替。
+7. core 没有读文件/读 stdin 的 API：文件与 stdin 走 `moonbitlang/x/fs`（`read_file_to_bytes`），
+   非 ASCII 大小写用小写方向走 `moonbitlang/x/unicode`（只有 `to_lowercase(Char)`，没有大写方向）。
+
+**AI 使用方式（本日）**
+- 仍然是「AI 打字、编译器判定」：先读 `docs/MOONBIT_GOTCHAS.md` 与既有 `src/`，再写代码，
+  每写一块就 `moon check` / `moon test`。上面 7 条坑全部是编译器/测试报出来后才修正的。
+- 符合率是**跑完整语料得到的真实数字**，跑了两轮（修复前 / 修复后），没有估算。
+
+---
+
 ## 待续

@@ -1,0 +1,6 @@
+// A runnable end-to-end example: build a dictionary and judge words.
+import {
+  "Careylq/spell",
+}
+
+pkgtype(kind: "executable")

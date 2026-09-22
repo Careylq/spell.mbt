@@ -1,0 +1,13 @@
+// Package `spell` turns a `.aff` + `.dic` pair into an indexed dictionary and
+// answers "is this word correct?".
+import {
+  "Careylq/spell/src/aff",
+  "Careylq/spell/src/affix",
+  "Careylq/spell/src/dic",
+  "moonbitlang/core/string",
+  "moonbitlang/x/unicode",
+}
+
+import {
+  "moonbitlang/core/debug",
+} for "test"

@@ -2,11 +2,25 @@
 package "Careylq/spell"
 
 // Values
+pub fn check(@Careylq/spell/src/spell.Dictionary, String) -> Bool
+
+pub fn encoding(@Careylq/spell/src/spell.Dictionary) -> String
+
+pub fn entry_count(@Careylq/spell/src/spell.Dictionary) -> Int
+
+pub fn flag_type_name(@Careylq/spell/src/spell.Dictionary) -> String
+
+pub fn load(String, String) -> @Careylq/spell/src/spell.Dictionary raise @Careylq/spell/src/spell.SpellError
+
+pub fn rule_count(@Careylq/spell/src/spell.Dictionary) -> Int
 
 // Errors
 
 // Types and methods
 
 // Type aliases
+pub using @Careylq/spell/src/spell {type Dictionary}
+
+pub using @Careylq/spell/src/spell {type SpellError}
 
 // Traits

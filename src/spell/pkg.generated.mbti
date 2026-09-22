@@ -1,0 +1,45 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Careylq/spell/src/spell"
+
+import {
+  "Careylq/spell/src/aff",
+  "Careylq/spell/src/dic",
+}
+
+// Values
+
+// Errors
+pub(all) suberror SpellError {
+  AffParse(@aff.AffParseError)
+  DicParse(@dic.DicParseError)
+}
+pub fn SpellError::output(Self, &Logger) -> Unit
+pub fn SpellError::to_string(Self) -> String
+pub impl Show for SpellError
+
+// Types and methods
+pub struct Dictionary {
+  entries : Map[String, Array[String]]
+  prefix_rules : Array[@aff.AffixRule]
+  suffix_rules : Array[@aff.AffixRule]
+  forbiddenword : String?
+  keepcase : String?
+  needaffix : String?
+  onlyincompound : String?
+  compound_flag : String?
+  compound_min : Int
+  word_chars : String
+  encoding : String
+  flag_type : @aff.FlagType
+  rule_count : Int
+}
+pub fn Dictionary::check(Self, String) -> Bool
+pub fn Dictionary::encoding(Self) -> String
+pub fn Dictionary::entry_count(Self) -> Int
+pub fn Dictionary::flag_type(Self) -> @aff.FlagType
+pub fn Dictionary::from_text(String, String) -> Self raise SpellError
+pub fn Dictionary::rule_count(Self) -> Int
+
+// Type aliases
+
+// Traits

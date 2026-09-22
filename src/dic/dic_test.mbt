@@ -32,6 +32,19 @@ test "count line and one entry per non-empty line" {
 }
 
 ///|
+test "text after the count on the same line is ignored" {
+  let text =
+    #|3 # Old Persian numbers, source: Wikipedia
+    #|cat
+    #|dog
+    #|bird
+  let dic = @dic.parse_dic(text, @aff.SingleChar)
+  @debug.assert_eq(dic.declared_count, 3)
+  @debug.assert_eq(dic.entries.length(), 3)
+  @debug.assert_eq(dic.entries[0].word, "cat")
+}
+
+///|
 test "single-character flags split one flag per Unicode scalar value" {
   let text =
     #|3

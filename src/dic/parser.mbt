@@ -70,8 +70,16 @@ pub fn parse_dic(
 
 ///|
 /// Parse the count line into a non-negative `Int`, or report why it is not one.
+///
+/// Hunspell reads the count with a numeric scan and ignores whatever follows it
+/// on the same line, and real dictionaries use that for a trailing comment
+/// (`4 # Old Persian numbers`). Only the first whitespace-separated field is
+/// therefore parsed; the error message still quotes the whole line so a
+/// malformed count reports exactly what was there.
 fn parse_count(line : DicLine) -> Int raise DicParseError {
-  let parsed : Int? = Some(@string.parse_int(line.text)) catch { _ => None }
+  let fields = split_whitespace(line.text)
+  let number = if fields.length() > 0 { fields[0] } else { line.text }
+  let parsed : Int? = Some(@string.parse_int(number)) catch { _ => None }
   match parsed {
     Some(count) =>
       if count < 0 {
