@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Careylq/spell/src/affix"
+
+import {
+  "Careylq/spell/src/aff",
+}
+
+// Values
+pub fn apply_rule(@aff.AffixRule, String) -> String?
+
+pub fn matches_condition(String, String, @aff.AffixKind) -> Bool
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

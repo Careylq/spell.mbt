@@ -75,4 +75,51 @@ LLM 对 MoonBit 的零样本正确率只有 0–1%（IEEE TSE 论文实测），
 
 ---
 
+## 2026-09-22 · Day 2（续）— `.dic` 解析器 + 词缀条件匹配器
+
+**做了什么**
+- `src/dic/`：`.dic` 词典解析。`parse_dic(text, flag_type) -> DicFile raise DicParseError`。
+  处理首行词条数、`word/FLAGS`、`word/FLAGS morph...`、`\/` 转义；
+  **flag 解码随 `FLAG` 类型变化**（单字符 / long 两位一组 / num 逗号分隔）。
+- `src/affix/`：词缀引擎的核心——
+  `matches_condition(condition, stem, kind) -> Bool`（Hunspell 的简化正则：`.` `[abc]` `[^abc]` 字面量）
+  与 `apply_rule(rule, stem) -> String?`（条件 → strip → add）。
+
+**验证结果（我复跑过）**
+```
+moon check --target all  → 0 errors, 0 warnings
+moon test  --target all  → 55/55 通过
+                           [wasm] [wasm-gc] [js] [native] 全部通过
+```
+切片 1 的 22 个 + 本切片 33 个 = 55 个测试。
+
+**测试抓出的两个"语义 bug"（编译器根本不会报）**
+1. 前缀规则的 add 必须**前置**，后缀才后置。第一版把 `PFX 0 re .` 也写成追加，
+   `create` 变成了 `createre`。
+2. condition 必须对**未 strip 的 stem** 匹配。`SFX y ied [^aeiou]y` 若先 strip 掉 `y`，
+   剩下的 `impl` 永远匹配不上以 `y` 结尾的模式。
+
+> 这两条都**不是语法错误**——AI 写出来照样编译通过。
+> 这正是本项目把"符合率"当核心证据的原因：**编译器保证语法，测试才保证语义。**
+
+**顺带修正了我自己的一个错误**
+我在给实现方的测试基准里把规则 `SFX y ication y` 作用在 `imply` 上的结果写成了
+`implification`，**正确答案是 `implication`**（`impl` + `ication`）。
+实现方发现并同时断言了两种情况。记录在此，因为它印证了本项目的工作方式：
+**谁的断言都不算数，只有跑出来的结果算数。**
+
+**新发现已归档**
+本切片又撞上 7 条新坑（`assert_true` 不在 `@debug`、`unused_package` 0029、
+`String` 的 UTF-16/码点语义差异、`moon fmt` 会改写 `moon.mod` 等），
+全部补进 `docs/MOONBIT_GOTCHAS.md`（现共 18 条）。
+
+**特别值得记的一条**：MoonBit 的 `String` 里
+`length()` 是 **UTF-16 code unit** 数、`char_length()` 才是**码点**数，
+`get_char(i)` 按 code unit 索引（切在代理对中间会返回 `None`），
+`to_array()` 才按码点给出 `Char`。
+**做 Unicode 正确的字符匹配必须用 `to_array()`/`char_length()`**——
+否则遇到 emoji 或非 BMP 汉字就会出错。本项目的条件匹配已按此实现。
+
+---
+
 ## 待续

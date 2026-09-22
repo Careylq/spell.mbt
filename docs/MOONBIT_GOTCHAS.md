@@ -103,7 +103,79 @@ moon explain --attribute <NAME>      # 查属性
 - 无 `SET` 行时 `encoding` 为空字符串。
 - 解析是**单趟**的，所以 `AF` 表必须出现在使用它的 `PFX`/`SFX` 之前（与真实文件一致）。
 
-## 本切片未做（有意留到后续）
+## 12. `assert_true` / `assert_false` **不在** `@debug` 里
 
-条件匹配、`COMPOUNDRULE`/`PATTERN` 匹配、`AM` 别名解析进 morph 字段、
-`ICONV`/`OCONV`、`.dic` 解析、`AF` 表出现在使用之后的情形。
+- `moonbitlang/core/debug` 只有 `assert_eq` / `debug` / `debug_inspect` / `dump` / `render` / `to_string`。
+- 写 `@debug.assert_true(...)` **会编译失败**。它们来自 builtin/prelude，**直接用无限定名即可**。
+- `@debug.assert_eq` 可用，但要求类型满足 `Eq + Debug`。
+
+## 13. warning `unused_package`（0029）
+
+- 在 `moon.pkg` 的 `for "test"` / `for "wbtest"` 里列了导入、但**测试文件还没真正用到**时会告警。
+- 所以一个写法完全正确的 `moon.pkg`，在测试写好之前也可能"看起来有警告"。别被误导（是 #10 的延续）。
+
+## 14. 🔴 `String` 的 Unicode 语义（做字符匹配必须搞清）
+
+| 方法 | 语义 |
+|---|---|
+| `length()` | **UTF-16 code unit** 数 |
+| `char_length()` | **Unicode 码点**数 |
+| `to_array()` | 每个**码点**一个 `Char`（会解码代理对） |
+| `get_char(i)` | 按 **code unit** 索引；若正好切在代理对中间返回 `None` |
+
+**结论：做 Unicode 正确的字符匹配/切片，必须用 `to_array()` 或 `char_length()`，
+不要用 `length()` / `get_char()`。**
+
+## 15. `moon fmt` 会改写 `moon.mod`
+
+- 它会往 `moon.mod` 里插空行，**弄脏你并不想动的文件**。
+- 只检查不写入：`moon fmt --check <包路径>`。
+- 本项目因此有几次 `moon.mod` 出现"无意义 diff"，已还原。
+
+## 16. `#|` 多行字符串不处理反斜杠转义
+
+- 所以测试数据里的字面 `\/` 可以原样写，不需要双重转义。
+
+## 17. 跨包使用没问题
+
+- 外部 `pub(all)` 结构体字面量 + 字段简写（pun `{ a, b }`）可用。
+- `@aff.Suffix` 这类枚举构造子既能当表达式也能当模式，跨包都正常。
+
+## 18. 已知局限（诚实记录）
+
+- `.dic` 开头的 **UTF-8 BOM (U+FEFF)** 未剥离 → 会报 "expected an entry count"。`.aff` 同样未处理 BOM。
+- `FLAG num` 的值未校验是否为十进制（按规范原样存字符串）。
+
+---
+
+## 附二：实现过程中被测试抓出来的两个真 bug（值得记住）
+
+这两条是**语义性错误**，不是语法错误——编译器不会报，只有测试能抓：
+
+1. **前缀规则必须"前置" add，后缀才"后置"**。
+   第一版把 `PFX 0 re .` 也写成了追加，于是 `create` 变成 `createre`。
+   正确结果：`recreate`。（典型的"想当然"错误）
+2. **condition 必须对「未 strip 的 stem」匹配**。
+   `SFX y ied [^aeiou]y` 要对 `imply` 生效：若先 strip 掉 `y` 变成 `impl`，
+   就**永远不可能**匹配 `[^aeiou]y`（该模式以 `y` 结尾）。
+   先匹配 condition、再 strip、最后 add，顺序不能错。
+
+> 这两条说明：**"AI 写的代码能编译" ≠ "语义正确"**。
+> 编译器只保证语法和类型，语义必须靠测试（这也是本项目以符合率作为核心证据的原因）。
+
+---
+
+## 附三：我给出的测试基准里也有一个错误（已修正）
+
+我在给实现方的规则对照表中写了：
+
+| 规则 | 词根 | 我预期的结果 |
+|---|---|---|
+| SFX, `y`, `ication`, `y` | `imply` | `implification` ❌ |
+
+**这是错的。** 正确答案是 **`implication`**（`impl` + `ication`）；
+`implification` 需要真实的 en_US 里另一条 `ification` 规则。
+
+实现方发现并同时断言了两种情况（`ication` → `implication`、`ification` → `implification`）。
+**记录下来是因为这正好印证了本项目的工作方式：谁来断言都不算数，只有跑出来的结果算数。**
+

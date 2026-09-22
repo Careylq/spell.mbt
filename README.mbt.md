@@ -51,23 +51,36 @@ moon add Careylq/spell
 
 ### Implemented
 
-- `.aff` parser: `SET`, `FLAG`, `AF`, `AM`, `PFX`, `SFX`, `REP`, `TRY`, `KEY`, `IGNORE`,
-  `WORDCHARS`, `COMPOUND*`, and the special-flag directives (`NOSUGGEST`, `KEEPCASE`,
-  `FORBIDDENWORD`, `NEEDAFFIX`, `CIRCUMFIX`, `ONLYINCOMPOUND`)
-- `.dic` parser: entries, flag strings, morphological fields
-- Affix rule engine: condition matching, strip/add generation
-- `spell()`: direct hit, affix-derived hit, capitalisation rules, special flags
-- Conformance harness against the official Hunspell test corpus
+- **`.aff` parser** — `SET`, `FLAG`, `AF`, `AM`, `PFX`, `SFX`, `REP`, `TRY`, `KEY`,
+  `IGNORE`, `WORDCHARS`, `COMPOUND*`, and the special-flag directives (`NOSUGGEST`,
+  `KEEPCASE`, `FORBIDDENWORD`, `NEEDAFFIX`, `CIRCUMFIX`, `ONLYINCOMPOUND`).
+  Unmodelled directives are collected in an `unrecognized` list rather than dropped.
+  Errors carry 1-based line numbers.
+- **`.dic` parser** — entry count, `word/FLAGS`, optional morphological fields, `\/`
+  escaping, and flag decoding for all four `FLAG` modes (single-char, `long`, `num`, `UTF-8`).
+- **Affix rule engine** — `matches_condition` (Hunspell's simplified pattern language:
+  `.`, `[abc]`, `[^abc]`, literals; anchored to the start for prefixes and the end for
+  suffixes) and `apply_rule` (condition then strip then add).
+  Unicode-correct: matching iterates code points, so non-BMP characters work.
 
-### Not implemented
+**Build status:** `moon check` reports 0 errors and 0 warnings; **55 tests pass on each of
+wasm, wasm-gc, js and native.**
 
+### Not implemented yet
+
+- **`spell()` orchestration** — wiring the dictionary and affix engine together, plus the
+  capitalisation rules and the `KEEPCASE` / `FORBIDDENWORD` / `NOSUGGEST` semantics applied
+  at lookup time. This is the next step; until it lands the conformance numbers above
+  cannot be produced.
+- **CLI** (`cmd/main`) — the `check` subcommand described in `conformance/README.md`.
 - **Suggestion generation** (`suggest()`) — edit distance, `REP`/`TRY`/`KEY` ranking.
   Planned for the next round.
-- Full compound-word support (only the basic `COMPOUNDMIN` / `COMPOUNDFLAG` cases)
-- Full support for every `.aff` directive; unsupported directives are collected in an
-  `unrecognized` list rather than silently ignored
-- FFI bindings to the Hunspell C++ library (this is a pure MoonBit implementation)
-- Any UI / editor plugin
+- Full compound-word support (only the basic `COMPOUNDMIN` / `COMPOUNDFLAG` cases).
+- FFI bindings to the Hunspell C++ library (this is a pure MoonBit implementation).
+- Any UI / editor plugin.
+
+**Known limitations:** a UTF-8 BOM at the start of a `.dic` file is not stripped; `FLAG num`
+values are stored verbatim without decimal validation.
 
 ## Design
 

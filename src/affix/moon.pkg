@@ -1,0 +1,14 @@
+// Package `affix` applies Hunspell `PFX`/`SFX` rules to stems.
+import {
+  "Careylq/spell/src/aff",
+}
+
+import {
+  "Careylq/spell/src/aff",
+  "moonbitlang/core/debug",
+} for "test"
+
+import {
+  "Careylq/spell/src/aff",
+  "moonbitlang/core/debug",
+} for "wbtest"

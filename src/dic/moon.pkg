@@ -1,0 +1,16 @@
+// Package `dic` parses Hunspell `.dic` word lists into a typed AST.
+import {
+  "Careylq/spell/src/aff",
+  "moonbitlang/core/string",
+  "moonbitlang/core/debug",
+}
+
+import {
+  "Careylq/spell/src/aff",
+  "moonbitlang/core/debug",
+} for "test"
+
+import {
+  "Careylq/spell/src/aff",
+  "moonbitlang/core/debug",
+} for "wbtest"
