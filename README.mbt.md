@@ -390,8 +390,23 @@ each of wasm, wasm-gc, js and native.
   suggestion, and there is no ngram/`MAXNGRAMSUGS` candidate generator. Edit distance 2 is
   only the bounded O(n²) subset listed above (no two arbitrary replacements, no
   replacement-plus-insertion). This is why `.sug` is at 62.4% rather than higher.
-- FFI bindings to the Hunspell C++ library (this is a pure MoonBit implementation).
+- FFI bindings to the Hunspell C++ library. The parsing, affix, judgement and suggestion
+  logic is written from scratch in MoonBit and links against no speller — see
+  [Native code](#native-code) for the one exception, a small stdin shim in the CLI.
 - Any UI / editor plugin.
+
+## Native code
+
+Every library package (`src/aff`, `src/dic`, `src/affix`, `src/spell`, `src/suggest`,
+`src/api`) is **pure MoonBit**: no `extern`, no C, no FFI, and no Hunspell code or bindings.
+That is why the four backends behave identically.
+
+The only C in the repository is `cmd/main/stdin_native.c` — 46 lines that `fread` stdin in
+64 KiB chunks. It exists because the native backend otherwise cannot read `--words -` from a
+pipe: the whole-file reader in `moonbitlang/x/fs` seeks to size its buffer, and a pipe is not
+seekable (`Illegal seek`). Nothing else about the CLI is backend-specific, and the other
+three backends keep using the unmodified whole-file path. `moonbitlang/x/fs` and
+`moonbitlang/x/sys` take the same approach for the same reason.
 
 ## Design
 

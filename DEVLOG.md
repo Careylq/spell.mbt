@@ -397,4 +397,83 @@ bash conformance/suggest.sh                 → .sug 最佳建议 108/173 (62.4%
 
 ---
 
+## 2026-09-22 · Day 5 — 跨后端缺陷修复：`--words -` 在 native 上读不了管道
+
+**问题（真实缺陷，不是重构）**
+- 契约里 `--words -` 从 stdin 逐行读词，`conformance/run.sh` 也依赖它。
+- 实现却把 `"/dev/stdin"` 交给 `@fs.read_file_to_bytes`，而它是**先 seek 到末尾拿长度**
+  再分配缓冲区。fd 0 是普通文件（`< file`）时可 seek，是**管道**时不可 seek：
+  `printf 'hello\nzzzz\n' | main.exe check ... --words -` →
+  `spell: cannot read "/dev/stdin": Illegal seek`，rc=1。
+- 后端差异是这条缺陷最坑的地方：`moon run`（wasm + moonrun）把 `/dev/stdin` 当预打开
+  文件处理，读管道正常。**同一段命令在本地（wasm）通过、在 native 发布版炸。**
+
+**怎么修的（先说结论：不是"报错引导"，是真的把管道读通了）**
+- 先查过现成的流式 API：`.mooncakes/moonbitlang/x/fs` 0.5.5 的 `.mbti` 里只有
+  `read_file_to_bytes` / `read_file_to_string`，**没有** reader/stream 接口；
+  `moonbitlang/x/sys` 和 core 也没有 stdin 读取。所以流式读取得自己做。
+- native/llvm 新增 `cmd/main/stdin_native.c`（`moon.pkg` 的 `native-stub`），用
+  `fread` 每次读 64 KiB，读到 EOF；MoonBit 侧 `read_all_chunks` 把块累积进
+  `Buffer`，再交给原来的 `decode_words`。**全程不需要知道输入长度**，因此管道可用。
+  返回 `-1` 时用 `strerror(errno)` 给出可操作报错（点名 native + 建议
+  `--words <file>` 或 `< file`）——但这只在真正的 I/O 错误时才可能触发。
+- `--words -` 与 `--words <file>` 的分派收进 `read_words_bytes`，`check` 和
+  `suggest` 共用；错误仍打印到 stderr、stdout 保持为空、退出码 1。
+- **wasm / wasm-gc / js 的读取代码一行没动**：它们的 host 本来就能读管道
+  （js 的 `fs.readFileSync` 自己处理不可 seek 的 fd）。如实说：这次修复对这三个后端的
+  读取路径**没有改变**。
+- 但 js 上还有另一个跨后端差异导致 CLI **根本跑不起来**：Node 的 `process.argv`
+  以解释器路径开头，`moon run --target js cmd/main -- check ...` 里 `args[1]` 是
+  **脚本路径**而不是子命令。加了 `command_args()`（`#cfg(target="js")`，只丢掉解释器
+  那一项，脚本路径占住"程序名"位），四个后端的命令行布局才一致。否则 js 的管道测试
+  连读取代码都到不了。
+
+**验证（全部自己跑出来的，不是推断）**
+```
+# 原生二进制 + 管道：修复前 Illegal seek，修复后
+$ printf 'hello\nzzzz\n' | _build/native/release/build/cmd/main/main.exe check \
+      --aff /tmp/p.aff --dic /tmp/p.dic --words -
+1
+0            # rc=0
+```
+- 四后端（native / wasm / wasm-gc / js）都实测了 `printf | ... --words -`、`< file`、
+  `--words <file>`、空 stdin（无输出 rc=0）、无结尾换行（仍有 1 条判定）、
+  `suggest` 管道、坏 `.dic`（非 0 退出、stdout 为空、stderr 有信息）。
+- 大输入：`cat /usr/share/dict/words | ... --words -`（235976 行）四后端
+  输出行数与输入行数**逐位相同**，rc=0。大输入会跨很多个 64 KiB 块，正好覆盖分块循环。
+- 新增 `conformance/pipe.sh` 把上面这些固化成回归检查（默认 native；`--all` 连
+  wasm/wasm-gc/js 一起测）。`moon test` 里造不出管道，所以这条端到端护栏放在脚本里。
+
+**没有回归（改动后重跑）**
+```
+moon check --deny-warn --target all         → 0 errors, 0 warnings
+moon test --target all                      → wasm/wasm-gc/js 118/118, native 122/122
+bash conformance/run.sh                     → .good 718/848 (84.7%)  .wrong 579/613 (94.5%)
+bash conformance/suggest.sh                 → 108/173 (62.4%), 93/173 (53.8%), 5/37
+bash conformance/pipe.sh --all              → 全部 ok
+```
+`.good`/`.wrong`/`.sug` 与修复前基线**逐位相同**。新增的 4 个单测（`read_all_chunks`
+的分块拼接、空输入、无结尾换行、错误传播）只存在于 native/llvm，因为被测函数本身
+按 `#cfg` 只在 native/llvm 编译；wasm/wasm-gc/js 的测试数仍是 118。
+
+**踩的坑（已补进 `docs/MOONBIT_GOTCHAS.md` #33）**
+1. **任何"先测长度再读"的 API 都不能用于 pipe/stdin**。`/dev/stdin → /dev/fd/0`，
+   fd 0 是管道时不可 seek。跨后端行为还不一致，最容易"本地过、发布炸"。
+2. `Bytes::to_string()` 不是 UTF-8 解码，而是带 `b"..."`、`\x0a` 转义的调试表示；
+   要拿到文本得用 `@unicode.to_utf8_string`。第一版新增测试就因此挂了 2 个，
+   被 `moon test` 抓出来。
+3. 未使用的**私有顶层函数**在 `--deny-warn` 下是 error（`unused_value`），
+   即使 whitebox 测试引用了它也一样；所以按后端 `#cfg` 出的辅助函数必须同时
+   `#cfg` 掉它的测试，否则另一个后端的检查会红。
+
+**AI 使用方式（本日）**
+- 先让 AI 去读**实际的 `.mbti` 接口文件**确认"有没有现成的流式 API"，而不是凭印象
+  编一个 API 名——结果是确实没有，才决定自己写 `native-stub`。
+- 让 AI 先写出会失败的回归测试（分块循环的单测 + `pipe.sh`），再改实现；两个真 bug
+  （`Bytes::to_string` 表示、`unused_value` 警告）都是"编译器/测试判定"抓出来的，
+  不是靠读代码看出来的。
+- 性能与符合率数字一律用脚本重跑，不在日志里估算。
+
+---
+
 ## 待续

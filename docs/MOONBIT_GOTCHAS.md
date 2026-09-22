@@ -282,6 +282,22 @@ pub using @spell { type Dictionary, type SpellError, load, check }
 
 ## 33. 🔴 原生后端的 `--words -` 读不了**管道**（wasm 后端可以）
 
+> **✅ 已修复（2026-09-22）**。本条目保留，因为"先测长度再读"这个坑本身值得记：
+> **任何按文件长度 seek 的读取 API 都不能用在 pipe / stdin 上**。
+>
+> - **修法**：native/llvm 不再把 `/dev/stdin` 交给 `read_file_to_bytes`，改为在
+>   `cmd/main/stdin_native.c`（moon.pkg 的 `native-stub`）里用 `fread` **分块读到
+>   EOF**（每次 64 KiB），MoonBit 侧由 `read_all_chunks` 累积成完整 `Bytes`
+>   （`cmd/main/main.mbt`）。读取过程不需要知道输入长度，所以 pipe 可用。
+> - **wasm / wasm-gc / js 未改读取代码**：它们的 host 本来就能读 pipe（js 走
+>   Node 的 `readFileSync`，本身会处理不可 seek 的 fd），改动只在 native 生效。
+> - **js 的另一个跨后端差异**：Node 的 `process.argv` 以解释器路径开头，所以
+>   `moon run --target js cmd/main -- check ...` 里 `args[1]` 是脚本路径而不是子命令，
+>   整个 CLI 在 js 上原本跑不起来。`command_args()`（`#cfg(target="js")`）丢掉
+>   解释器那一项后，四个后端的命令行布局一致。
+> - **修复后实测**：`printf 'hello\nzzzz\n' | main.exe check ... --words -` → `1`/`0`，rc=0；
+>   `cat /usr/share/dict/words | main.exe check ... --words -` → 235976 行输出，rc=0。
+
 - **背景**：CLI 的 `--words -` 约定从 stdin 逐行读词（见 `conformance/README.md`）。
   实现是把 `"/dev/stdin"` 交给 `@fs.read_file_to_bytes`。
 - **症状**：`printf 'hello\nzzzz\n' | <native-binary> check ... --words -`
@@ -293,9 +309,9 @@ pub using @spell { type Dictionary, type SpellError, load, check }
   处理，读管道正常；`--target native` 走真实文件系统，因此**只有 native 会失败**。
   同一段命令在两个后端行为不同，很容易在本地（moon run）测过、CI/发布版（native）
   才炸。
-- **规避**：用 `< file` 重定向（`conformance/run.sh` 就是这么做的），或者直接传
-  `--words <file>`。`bench/run.sh` 一律传显式文件路径，所以不受影响。
-- **实测**（moon 0.1.20260920 / macOS 26.6.2 arm64）：
+- **规避**（修复前）：用 `< file` 重定向（`conformance/run.sh` 就是这么做的），或者
+  直接传 `--words <file>`。`bench/run.sh` 一律传显式文件路径，所以不受影响。
+- **实测**（moon 0.1.20260920 / macOS 26.6.2 arm64，修复前）：
 
 ```bash
 printf 'hello\nzzzz\n' | main.exe check --aff a.aff --dic d.dic --words -   # Illegal seek, rc=1

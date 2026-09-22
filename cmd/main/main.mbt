@@ -32,10 +32,36 @@ priv enum FileEncoding {
 ///|
 /// Run the command line and terminate with its status.
 fn main {
-  let status = run(@env.args())
+  let status = run(command_args())
   if status != 0 {
     @sys.exit(status)
   }
+}
+
+///|
+/// The command line with the program name first, as `run` expects.
+///
+/// The wasm, wasm-gc and native runtimes already report it that way. Node's
+/// `process.argv` (the js backend) starts with the interpreter path instead, so
+/// that one entry is dropped and the script path takes the program-name slot.
+/// Without this, `--words -` on the js backend could not even reach the
+/// word-reading code: the "subcommand" slot held the script path.
+#cfg(target="js")
+fn command_args() -> Array[String] {
+  let args = @env.args()
+  let tail : Array[String] = []
+  let mut index = 1
+  while index < args.length() {
+    tail.push(args[index])
+    index = index + 1
+  }
+  tail
+}
+
+///|
+#cfg(not(target="js"))
+fn command_args() -> Array[String] {
+  @env.args()
 }
 
 ///|
@@ -106,8 +132,7 @@ fn run(args : Array[String]) -> Int {
     Some(source) => source
     None => "-"
   }
-  let words_path = if words_source == "-" { "/dev/stdin" } else { words_source }
-  let words_bytes = match read_bytes(words_path) {
+  let words_bytes = match read_words_bytes(words_source) {
     Ok(bytes) => bytes
     Err(message) => {
       eprintln("spell: \{message}")
@@ -196,8 +221,7 @@ fn run_suggest(args : Array[String]) -> Int {
     Some(source) => source
     None => "-"
   }
-  let words_path = if words_source == "-" { "/dev/stdin" } else { words_source }
-  let words_bytes = match read_bytes(words_path) {
+  let words_bytes = match read_words_bytes(words_source) {
     Ok(bytes) => bytes
     Err(message) => {
       eprintln("spell: \{message}")
@@ -259,11 +283,118 @@ fn parse_options(args : Array[String]) -> Result[Options, String] {
 }
 
 ///|
-/// Read a whole file (or the `/dev/stdin` pseudo-file for `--words -`) raw.
+/// Read a whole file (or, for anything that is not `-`, the word list) raw.
 fn read_bytes(path : String) -> Result[Bytes, String] {
   Ok(@fs.read_file_to_bytes(path)) catch {
     @fs.IOError(message) => Err("cannot read \"\{path}\": \{message}")
   }
+}
+
+///|
+/// Read the `--words` input: `-` means stdin, anything else is a path.
+///
+/// Stdin is handled separately from a path because the native backend cannot
+/// size a stream by seeking (see `read_stdin_bytes`).
+fn read_words_bytes(source : String) -> Result[Bytes, String] {
+  if source == "-" {
+    read_stdin_bytes()
+  } else {
+    read_bytes(source)
+  }
+}
+
+///|
+/// Read all of stdin raw.
+///
+/// The native (and llvm) backend must not use `read_bytes("/dev/stdin")`: that
+/// helper seeks to the end of the stream to learn how many bytes to allocate,
+/// and a **pipe** is not seekable, so `printf 'hello\n' | spell ... --words -`
+/// failed with `Illegal seek` (docs/MOONBIT_GOTCHAS.md #33). Native instead
+/// pulls the stream in fixed-size chunks until EOF, which needs no seek.
+///
+/// wasm, wasm-gc and js expose no fd/stream layer to MoonBit, but their host
+/// already resolves `/dev/stdin` for `read_file_to_bytes` and reads a pipe
+/// correctly, so those backends keep the whole-file read.
+#cfg(any(target="native", target="llvm"))
+fn read_stdin_bytes() -> Result[Bytes, String] {
+  read_all_chunks(native_stdin_chunks())
+}
+
+///|
+#cfg(not(any(target="native", target="llvm")))
+fn read_stdin_bytes() -> Result[Bytes, String] {
+  read_bytes("/dev/stdin")
+}
+
+///|
+/// How many bytes `read_all_chunks` asks for at a time.
+#cfg(any(target="native", target="llvm"))
+let stdin_chunk_size : Int = 65536
+
+///|
+/// Read a byte source to the end by appending one chunk after another.
+///
+/// `source` returns the next slice of input, or an empty view at end of input,
+/// or `Err` if the read failed. This is the shape of a `fread` loop, and it is
+/// what makes a non-seekable pipe readable: the length of the input never has to
+/// be known in advance.
+#cfg(any(target="native", target="llvm"))
+fn read_all_chunks(
+  source : () -> Result[BytesView, String],
+) -> Result[Bytes, String] {
+  let buffer = Buffer()
+  while true {
+    match source() {
+      Err(message) => return Err(message)
+      Ok(chunk) => {
+        if chunk.is_empty() {
+          break
+        }
+        buffer.write_bytes(chunk)
+      }
+    }
+  }
+  Ok(buffer.to_bytes())
+}
+
+///|
+/// Hand `read_all_chunks` one chunk of stdin at a time, with a plain `fread` on
+/// a buffer that is reused, so no seek is involved and no data is copied twice.
+/// `-1` from the C stub means the read failed.
+#cfg(any(target="native", target="llvm"))
+fn native_stdin_chunks() -> () -> Result[BytesView, String] {
+  let scratch = Bytes::make(stdin_chunk_size, 0)
+  fn() {
+    let count = read_stdin_chunk(scratch, scratch.length())
+    if count < 0 {
+      Err(stdin_read_error())
+    } else {
+      Ok(scratch.exact_view(end=count))
+    }
+  }
+}
+
+///|
+/// Read up to `capacity` bytes of stdin into `buffer`. Returns the number of
+/// bytes read, `0` at end of input, or `-1` on error (with `errno` set).
+#cfg(any(target="native", target="llvm"))
+#borrow(buffer)
+extern "C" fn read_stdin_chunk(buffer : Bytes, capacity : Int) -> Int = "moonbit_spell_read_stdin_chunk"
+
+///|
+/// The reason the last `read_stdin_chunk` failed, as bytes.
+#cfg(any(target="native", target="llvm"))
+extern "C" fn read_stdin_error_ffi() -> Bytes = "moonbit_spell_stdin_error"
+
+///|
+/// A clear, actionable message for a failed stdin read. The seek limitation
+/// this reader was written to avoid is gone, so this only fires on a genuine
+/// I/O error (a closed descriptor, a hard read failure, ...); it still names the
+/// backend and points at the two ways to avoid stdin.
+#cfg(any(target="native", target="llvm"))
+fn stdin_read_error() -> String {
+  let reason = @unicode.to_utf8_string(read_stdin_error_ffi())
+  "cannot read \"-\" (stdin) on the native backend: \{reason}; pass --words <file> or redirect stdin from a regular file (\"< file\")"
 }
 
 ///|

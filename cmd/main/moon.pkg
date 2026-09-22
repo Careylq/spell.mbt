@@ -11,4 +11,10 @@ import {
   "moonbitlang/x/unicode",
 } for "wbtest"
 
+// `--words -` reads stdin in chunks instead of seeking for its size, so that a
+// pipe works on the native backend. See docs/MOONBIT_GOTCHAS.md #33.
 pkgtype(kind: "executable")
+
+options(
+  "native-stub": [ "stdin_native.c" ],
+)
