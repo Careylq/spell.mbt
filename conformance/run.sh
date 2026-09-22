@@ -23,7 +23,54 @@ cd "$REPO_ROOT"
 
 export PATH="$HOME/.moon/bin:$PATH"
 
+# ---------------------------------------------------- check the CLI is available
+# Contract (see conformance/README.md):
+#   moon run cmd/main -- check --aff <a.aff> --dic <d.dic> --words -
+#   reads words from stdin, prints one "1" (correct) or "0" (incorrect) per line.
+#
+# The probe uses a synthetic dictionary created right here, so that skipping never
+# touches the network. It also verifies the OUTPUT SHAPE: a program that ignores its
+# arguments and prints nothing must not be mistaken for a working CLI — otherwise an
+# empty run would be reported as a genuine 0% pass rate.
+PROBE_DIR="$(mktemp -d)"
+cat > "$PROBE_DIR/probe.aff" <<'PROBE_AFF_EOF'
+SET UTF-8
+TRY abcdefghijklmnopqrstuvwxyz
+PROBE_AFF_EOF
+cat > "$PROBE_DIR/probe.dic" <<'PROBE_DIC_EOF'
+2
+hello
+world
+PROBE_DIC_EOF
+
+CLI_OK=0
+if [ -d cmd/main ]; then
+  probe_out="$(printf 'hello\nzzzz\n' \
+    | moon run cmd/main -- check --aff "$PROBE_DIR/probe.aff" --dic "$PROBE_DIR/probe.dic" --words - 2>/dev/null)"
+  n_lines="$(printf '%s\n' "$probe_out" | grep -cE '^[01]$' || true)"
+  if [ "$n_lines" = "2" ] \
+     && [ "$(printf '%s\n' "$probe_out" | sed -n 1p)" = "1" ] \
+     && [ "$(printf '%s\n' "$probe_out" | sed -n 2p)" = "0" ]; then
+    CLI_OK=1
+  fi
+fi
+rm -rf "$PROBE_DIR"
+
+if [ "$CLI_OK" -ne 1 ]; then
+  echo
+  echo "SKIP: the 'check' subcommand is missing or does not follow the contract,"
+  echo "      so no conformance numbers can be produced."
+  echo "      Expected: 'hello' then 'zzzz' on stdin -> two lines of 0/1, i.e. 1 then 0."
+  echo "      See conformance/README.md for the CLI contract."
+  if [ "${CONFORMANCE_REQUIRE_CLI:-0}" = "1" ]; then
+    echo "FAIL: CONFORMANCE_REQUIRE_CLI=1 but the CLI is not ready." >&2
+    exit 1
+  fi
+  exit 0
+fi
+
 # ---------------------------------------------------------------- locate corpus
+# Fetched only once the CLI is known to work, so skipping costs no network.
 CLEANUP=""
 if [ -n "${HUNSPELL_DIR:-}" ]; then
   TESTS="$HUNSPELL_DIR/tests"
@@ -42,31 +89,6 @@ else
   TESTS="$TMP/hunspell/tests"
 fi
 trap '[ -n "$CLEANUP" ] && rm -rf "$CLEANUP"' EXIT
-
-# ---------------------------------------------------- check the CLI is available
-# Contract (see conformance/README.md):
-#   moon run cmd/main -- check --aff <a.aff> --dic <d.dic> --words -
-#   reads words from stdin, prints one "1" (correct) or "0" (incorrect) per line.
-PROBE_AFF="$(find "$TESTS" -name '*.aff' | head -1)"
-PROBE_DIC="${PROBE_AFF%.aff}.dic"
-CLI_OK=0
-if [ -n "$PROBE_AFF" ] && [ -f "$PROBE_DIC" ] && [ -d cmd/main ]; then
-  if printf 'the\nthe\n' | moon run cmd/main -- check --aff "$PROBE_AFF" --dic "$PROBE_DIC" --words - \
-       >/dev/null 2>&1; then
-    CLI_OK=1
-  fi
-fi
-
-if [ "$CLI_OK" -ne 1 ]; then
-  echo
-  echo "SKIP: the 'check' subcommand is not available yet, so no conformance numbers can be produced."
-  echo "      Implement cmd/main 'check' per conformance/README.md, then re-run this script."
-  if [ "${CONFORMANCE_REQUIRE_CLI:-0}" = "1" ]; then
-    echo "FAIL: CONFORMANCE_REQUIRE_CLI=1 but the CLI is not ready." >&2
-    exit 1
-  fi
-  exit 0
-fi
 
 # ------------------------------------------------------------------- run suites
 printf '%-34s %-16s %-16s\n' "suite" "good" "wrong"
@@ -93,14 +115,13 @@ for aff in $(find "$TESTS" -name '*.aff' | sort); do
 
   if [ -f "$good" ]; then
     got="$(run_words "$aff" "$dic" "$good")"
-    # compare line by line against the expectation "1"
-    g_tot=$(grep -c . "$good")
+    g_tot=$(grep -c . "$good" || true)
     g_pass=$(paste -d' ' <(grep . "$good") <(printf '%s\n' "$got") 2>/dev/null | awk '$2==1' | wc -l | tr -d ' ')
   fi
 
   if [ -f "$wrong" ]; then
     got="$(run_words "$aff" "$dic" "$wrong")"
-    w_tot=$(grep -c . "$wrong")
+    w_tot=$(grep -c . "$wrong" || true)
     w_pass=$(paste -d' ' <(grep . "$wrong") <(printf '%s\n' "$got") 2>/dev/null | awk '$2==0' | wc -l | tr -d ' ')
   fi
 
