@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
+## [0.5.0] — 2026-09-27
+
+### Added
+- **`ICONV` / `OCONV` conversion tables.** `ICONV` normalises the word before lookup;
+  `OCONV` rewrites suggestion output. The `.aff` parser reads the `ICONV n` / `OCONV n`
+  header and its declared pairs, including the trailing `_` end-of-word marker, and
+  `lookup` applies `ICONV` **before** `IGNORE` filtering (the order matters).
+
+  This is a real-world fix rather than test-suite polish: the LibreOffice `en_US`
+  dictionary declares `ICONV 1` / `ICONV ’ '`, so without it a typographic apostrophe
+  produced a false rejection. Verified against that dictionary — `don't` and `don’t`
+  are now both accepted.
+
+### Changed
+- Conformance: `.good` rises from **718/848 (84.7%)** to **730/848 (86.1%)**;
+  `.wrong` is unchanged at **579/613 (94.5%)**.
+
 ## [0.4.0] — 2026-09-22
 
 ### Added

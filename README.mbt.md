@@ -11,7 +11,7 @@ for the words it rejects.
 > code block below is verified by `moon check`. `README.md` is a symlink to this file
 > so that GitHub renders it.
 
-> **Status: 0.4.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
+> **Status: 0.5.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
 > judgement engine, the suggestion engine, the public API and the `check` /
 > `suggest` CLI subcommands are implemented and tested on all four backends. See
 > [Not implemented yet](#not-implemented-yet) for what suggestion generation
