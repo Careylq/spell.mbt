@@ -54,3 +54,17 @@ test "KEY rows are split on the pipe" {
   assert_eq(rows[1], ['d', 'e'])
   assert_eq(parse_key_rows("").length(), 1)
 }
+
+///|
+test "MAP groups split single characters and parenthesized sequences" {
+  assert_eq(parse_map_group("uü"), ["u", "ü"])
+  assert_eq(parse_map_group("ß(ss)"), ["ß", "ss"])
+  assert_eq(parse_map_group("(ọ́)o"), ["ọ́", "o"])
+  assert_eq(parse_map_group("a"), ["a"])
+  // an unclosed group runs to the end of the line
+  assert_eq(parse_map_group("x(yz"), ["x", "yz"])
+  assert_eq(parse_map_group(""), ([] : Array[String]))
+  // a group with fewer than two alternatives cannot substitute anything
+  assert_eq(parse_map_groups(["a"]).length(), 0)
+  assert_eq(parse_map_groups(["ab", "c"]).length(), 1)
+}

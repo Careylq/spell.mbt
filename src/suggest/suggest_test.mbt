@@ -220,3 +220,117 @@ test "results are deduplicated, never the input, and truncated to the limit" {
   let limited = @suggest.suggest(dictionary, "helo", 1)
   assert_eq(limited.length(), 1)
 }
+
+///|
+test "MAP groups substitute related characters, once or several times" {
+  let aff =
+    #|SET UTF-8
+    #|TRY abcdefghijklmnopqrstuvwxyz
+    #|MAP 2
+    #|MAP uü
+    #|MAP ß(ss)
+  let dic =
+    #|2
+    #|Füße
+    #|groß
+  let dictionary = load(aff, dic)
+  // two substitutions in one word (`u` -> `ü` and `ss` -> `ß`); neither the
+  // edit pass nor the REP pass can produce this
+  let fuss = @suggest.suggest(dictionary, "Fusse", 5)
+  assert_true(fuss.contains("Füße"))
+  // one multi-character substitution, shortening the word
+  assert_eq(@suggest.suggest(dictionary, "gross", 5), ["groß"])
+}
+
+///|
+test "MAP substitutes a parenthesized multi-character alternative" {
+  let aff =
+    #|SET UTF-8
+    #|TRY abcdefghijklmnopqrstuvwxyz
+    #|MAP 1
+    #|MAP ß(ss)
+  // ß -> ss lengthens the word by one character
+  let lengthen = load(aff, "1\nFuss")
+  assert_true(@suggest.suggest(lengthen, "Fuß", 5).contains("Fuss"))
+  // and ss -> ß shortens it again
+  let shorten = load(aff, "1\nFuß")
+  assert_true(@suggest.suggest(shorten, "Fuss", 5).contains("Fuß"))
+}
+
+///|
+test "ph: fields act as the inner REP table" {
+  let aff =
+    #|SET UTF-8
+    #|TRY abcdefghijklmnopqrstuvwxyz
+    #|SFX B Y 1
+    #|SFX B y iest [^aeiou]y
+  let dic =
+    #|4
+    #|knight ph:nite
+    #|which ph:wich
+    #|witch ph:wich
+    #|happy/B ph:hepy ph:hepi->happi
+  let dictionary = load(aff, dic)
+  // a plain transliteration
+  assert_true(@suggest.suggest(dictionary, "nite", 5).contains("knight"))
+  // two entries share a transliteration; both are offered
+  let wich = @suggest.suggest(dictionary, "wich", 5)
+  assert_true(wich.contains("which"))
+  assert_true(wich.contains("witch"))
+  // the `->` form is a replacement rule, so an affixed form is reachable
+  assert_true(@suggest.suggest(dictionary, "hepiest", 10).contains("happiest"))
+}
+
+///|
+test "ph: word pairs are suggested with their space" {
+  let aff =
+    #|SET UTF-8
+    #|TRY abcdefghijklmnopqrstuvwxyz
+  let dic =
+    #|2
+    #|tea pot ph:teapot
+    #|spoon
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("tea pot"))
+  assert_eq(@suggest.suggest(dictionary, "teapot", 5), ["tea pot"])
+}
+
+///|
+test "PHONE proposes words with the same phonetic key" {
+  let aff =
+    #|SET UTF-8
+    #|TRY abcdefghijklmnopqrstuvwxyz
+    #|PHONE 4
+    #|PHONE C K
+    #|PHONE K K
+    #|PHONE TT- _
+    #|PHONE T T
+  let dic =
+    #|1
+    #|cat
+  let dictionary = load(aff, dic)
+  // `C` and `K` collapse and a doubled `TT` collapses to one `T`, so `kaatt`
+  // and `cat` share the key `KT`; `kaatt` needs a replacement *plus* a deletion,
+  // which the bounded distance-2 pass does not generate.
+  assert_eq(dictionary.phonetic_key("kaatt"), dictionary.phonetic_key("cat"))
+  assert_true(@suggest.suggest(dictionary, "kaatt", 5).contains("cat"))
+}
+
+///|
+test "a PHONE suggestion is dressed in the input's capitalisation" {
+  let aff =
+    #|SET UTF-8
+    #|TRY abcdefghijklmnopqrstuvwxyz
+    #|PHONE 3
+    #|PHONE C K
+    #|PHONE K K
+    #|PHONE T T
+  let dic =
+    #|1
+    #|cat
+  let dictionary = load(aff, dic)
+  // the key drops the vowel `a`, so `kt` is phonetically `cat`
+  assert_true(@suggest.suggest(dictionary, "kt", 5).contains("cat"))
+  assert_true(@suggest.suggest(dictionary, "Kt", 5).contains("Cat"))
+  assert_true(@suggest.suggest(dictionary, "KT", 5).contains("CAT"))
+}

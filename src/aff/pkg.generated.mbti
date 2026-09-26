@@ -25,11 +25,16 @@ pub(all) struct AffFile {
   flag_aliases : Array[String]
   morph_aliases : Array[String]
   replacements : Array[Replacement]
+  map_groups : Array[String]
+  phone_rules : Array[PhoneRule]
+  iconv : Array[Conversion]
+  oconv : Array[Conversion]
   try_chars : String
   keyboard : String
   ignore_chars : String
   word_chars : String
   check_sharps : Bool
+  complex_prefixes : Bool
   breaks_declared : Bool
   break_patterns : Array[String]
   compound_min : Int
@@ -69,11 +74,21 @@ pub(all) struct AffixRule {
   morph : Array[String]
 } derive(Eq, @debug.Debug)
 
+pub(all) struct Conversion {
+  from : String
+  to : String
+} derive(Eq, @debug.Debug)
+
 pub(all) enum FlagType {
   SingleChar
   Long
   Num
   Utf8
+} derive(Eq, @debug.Debug)
+
+pub(all) struct PhoneRule {
+  pattern : String
+  replacement : String
 } derive(Eq, @debug.Debug)
 
 pub(all) struct Replacement {

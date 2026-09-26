@@ -213,3 +213,34 @@ test "error: a negative count line reports its line" {
   @debug.assert_eq(line, 2)
   @debug.assert_eq(message, "entry count must not be negative, found \"-3\"")
 }
+
+///|
+test "full_word joins the tokens before the first morphological field" {
+  let text =
+    #|4
+    #|hello
+    #|sun flower ph:sunflour
+    #|black bird/S po:noun
+    #|tea pot
+  let dic = @dic.parse_dic(text, @aff.SingleChar)
+  // a plain entry: the whole spelling is the first field
+  @debug.assert_eq(dic.entries[0].word, "hello")
+  @debug.assert_eq(dic.entries[0].full_word, "hello")
+  @debug.assert_eq(dic.entries[0].morph, ([] : Array[String]))
+  // a word pair stops at `ph:` and keeps its space
+  @debug.assert_eq(dic.entries[1].word, "sun")
+  @debug.assert_eq(dic.entries[1].full_word, "sun flower")
+  @debug.assert_eq(dic.entries[1].morph, ["ph:sunflour"])
+  // flags live on the last word token; `word` keeps the first field's flags,
+  // `full_flags` carries the whole spelling's
+  @debug.assert_eq(dic.entries[2].word, "black")
+  @debug.assert_eq(dic.entries[2].full_word, "black bird")
+  @debug.assert_eq(dic.entries[2].flags, ([] : Array[String]))
+  @debug.assert_eq(dic.entries[2].full_flags, ["S"])
+  @debug.assert_eq(dic.entries[2].morph, ["po:noun"])
+  // no morphological field at all: every token belongs to the word
+  @debug.assert_eq(dic.entries[3].word, "tea")
+  @debug.assert_eq(dic.entries[3].full_word, "tea pot")
+  @debug.assert_eq(dic.entries[3].full_flags, ([] : Array[String]))
+  @debug.assert_eq(dic.entries[3].morph, ([] : Array[String]))
+}

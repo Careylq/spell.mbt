@@ -473,3 +473,39 @@ test "error: out-of-range AF alias in a PFX flag" {
     ),
   )
 }
+
+///|
+test "MAP is parsed into verbatim groups" {
+  let aff =
+    #|SET UTF-8
+    #|MAP 3
+    #|MAP uü
+    #|MAP oóö
+    #|MAP ß(ss)
+    #|TRY abc
+  let parsed = @aff.parse_aff(aff)
+  assert_eq(parsed.map_groups, ["uü", "oóö", "ß(ss)"])
+  // a `MAP 0` table is legal and leaves the list empty
+  let empty = @aff.parse_aff("MAP 0")
+  assert_eq(empty.map_groups, ([] : Array[String]))
+}
+
+///|
+test "PHONE is parsed into pattern/replacement rules" {
+  let aff =
+    #|PHONE 3
+    #|PHONE C K
+    #|PHONE TT- _
+    #|PHONE A(HR)^ *
+  let parsed = @aff.parse_aff(aff)
+  assert_eq(parsed.phone_rules.length(), 3)
+  assert_eq(parsed.phone_rules[0].pattern, "C")
+  assert_eq(parsed.phone_rules[0].replacement, "K")
+  assert_eq(parsed.phone_rules[1].pattern, "TT-")
+  assert_eq(parsed.phone_rules[1].replacement, "_")
+  assert_eq(parsed.phone_rules[2].pattern, "A(HR)^")
+  // neither directive lands in `unrecognized` any more
+  for directive in parsed.unrecognized {
+    assert_false(directive.name == "MAP" || directive.name == "PHONE")
+  }
+}

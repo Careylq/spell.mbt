@@ -74,6 +74,24 @@ pub fn parse_aff(text : String) -> AffFile raise AffParseError {
           builder.replacements.push({ from, to, })
         }
       }
+      "MAP" => {
+        let count = parse_count(arg_at(line, 1, name), line.number, name)
+        let (body, next) = take_body(lines, index, name, count, line.number)
+        index = next
+        for entry in body {
+          builder.map_groups.push(join_tail(entry, 1))
+        }
+      }
+      "PHONE" => {
+        let count = parse_count(arg_at(line, 1, name), line.number, name)
+        let (body, next) = take_body(lines, index, name, count, line.number)
+        index = next
+        for entry in body {
+          let pattern = arg_at(entry, 1, name)
+          let replacement = arg_at(entry, 2, name)
+          builder.phone_rules.push({ pattern, replacement, })
+        }
+      }
       "ICONV" => index = parse_conversion(builder.iconv, lines, index, line)
       "OCONV" => index = parse_conversion(builder.oconv, lines, index, line)
       "TRY" => builder.try_chars = arg_at(line, 1, name)
@@ -151,6 +169,8 @@ priv struct AffBuilder {
   flag_aliases : Array[String]
   morph_aliases : Array[String]
   replacements : Array[Replacement]
+  map_groups : Array[String]
+  phone_rules : Array[PhoneRule]
   iconv : Array[Conversion]
   oconv : Array[Conversion]
   mut try_chars : String
@@ -193,6 +213,8 @@ fn new_builder() -> AffBuilder {
     flag_aliases: [],
     morph_aliases: [],
     replacements: [],
+    map_groups: [],
+    phone_rules: [],
     iconv: [],
     oconv: [],
     try_chars: "",
@@ -243,6 +265,8 @@ fn finish(builder : AffBuilder) -> AffFile {
     flag_aliases: builder.flag_aliases,
     morph_aliases: builder.morph_aliases,
     replacements: builder.replacements,
+    map_groups: builder.map_groups,
+    phone_rules: builder.phone_rules,
     iconv: builder.iconv,
     oconv: builder.oconv,
     try_chars: builder.try_chars,

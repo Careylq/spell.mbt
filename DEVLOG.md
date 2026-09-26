@@ -525,4 +525,91 @@ can't → 1     can’t → 1
 
 ---
 
+## 2026-09-27 · Day 7 — `MAP` / `ph:` / `PHONE`：把 `.sug` 从 62.4% 推到 76.9%
+
+**背景**：Day 6 结束时 `.sug` 只命中 108/173。上一轮把 65 个未命中的期望行归因到几个
+「被刻意跳过的 pass」：`PHONE`/`ph:`（21）、`MAP`（6）、`OCONV`（3，Day 6 已实现）、
+`FORCEUCASE`（2），其余归 ngram / distance-2。本轮做前两项。
+
+**做了什么**
+
+1. **`MAP`（先做，规格最小）**
+   - `src/aff/`：解析 `MAP n` + 表体，`AffFile::map_groups` 原样保存。
+   - `src/suggest/suggest.mbt`：把每个 group 拆成「单字符 / 括号多字符串」两种 alternative
+     （`ß(ss)` → `ß` 与 `ss`），然后**递归**地在同一单词的多个位置做替换——
+     手册明确说 MAP 是解决「一个词里多次选错相关字母」的，只换一处不够。
+   - 递归有 `MAX_MAP_CANDIDATES = 2048` 的预算，异常表不会把引擎拖死。
+
+2. **`ph:` 字典字段 = 手册说的 “inner REP table”**
+   - `src/dic/`：新增 `DicEntry::full_word` / `full_flags`。`.dic` 的 morph 字段从**第一个
+     含 `:` 的 token** 开始，之前的 token 合成一个词——所以 `a lot ph:alot` 是一个带空格的词，
+     `forbidden root/A` 的 flag `A` 属于整个词而不是首字段。`word`（首字段）保持不变，
+     因为判定引擎依赖它（`wordpair` 那条 `compound word`）。
+   - `src/spell/suggest_rules.mbt`：把每个 `ph:` 值变成 REP 规则，支持手册的三种写法：
+     普通 `ph:wich`、尾部 `*`（**pattern 和词都要去掉最后一字符**，`prity*` → `prit`→`prett`）、
+     箭头 `ph:hepi->happi`；并额外生成首字母大写与全大写两份，后者让 `OMG` 得到 `OH, MY GOSH!`。
+   - 词对也要能被 `check` 接受，所以整词拼写会作为额外的词典条目登记（flag 取最后一个
+     词 token 的），否则 `a lot` 这类建议会被 `push_candidate` 的 `check` 过滤掉。
+
+3. **`PHONE` 音码表**
+   - 语义来自 **Aspell 的 “Phonetic Code” 章节**（`hunspell(5)` 指向它）与本地
+     `hunspell(5)` man page：规则按表序、首个匹配者胜；`(class)` 匹配其一；前导 `-` 表示
+     「整段匹配、只替换前段、保留尾部并重新扫描」；`<` 表示「替换后从替换串继续扫描」；
+     数字是优先级；`^`/`$` 是词首/词尾锚点；`_` 表示输出空串；无法匹配的字符直接丢弃；
+     全大写后转写。
+   - 装载时对全部 49,568 个 `en_US` 词条建一次音码索引；`.dic` 带 `ph:` 字段的条目用
+     该字段作为音码（`xxxxxxxxxx ph:Brasilia` 与 `Brasilia` 同音）。
+   - 建议按输入的大小写打扮（`kt`→`cat`、`Kt`→`Cat`、`KT`→`CAT`），并且**排在所有
+     字符类建议之后**，不会顶掉原来的首选。
+
+**逐项实测（`HUNSPELL_DIR=/tmp/hunspell_dl/hunspell-master`）**
+
+| 指标 | 基线 | MAP 后 | `ph:` 后 | `PHONE` 后 |
+|---|---|---|---|---|
+| `.sug` best | 108/173 = 62.4% | 114/173 | 133/173 = 76.9% | **133/173 = 76.9%** |
+| `.sug` as-first | 93/173 = 53.8% | 99/173 | 118/173 = 68.2% | **118/173 = 68.2%** |
+| `.sug` exact suites | 5/37 | 7/37 | 7/37 | **7/37** |
+| `map` / `maputf` | 0/3 / 0/3 | 3/3 / 3/3 | 3/3 / 3/3 | 3/3 / 3/3 |
+| `ph` | 3/11 | 3/11 | 11/11 | 11/11 |
+| `ph2` | 1/14 | 1/14 | 12/14 | 12/14 |
+| `.good` | 730/848 | 730/848 | 730/848 | 730/848 |
+| `.wrong` | 579/613 | 579/613 | 579/613 | 579/613 |
+
+- `PHONE` 本身对语料分数是 **0 增量**：唯一带 `PHONE` 表的 `phone` suite 本来就 1/1（它期望
+  的第一条 `Brasilia` 由字符距离就能得到）。它的价值是语义完整（`Brasilian` → `Brazilian`
+  现在来自音码匹配）与可测的成本，而不是分数。诚实记录这一点。
+- `ph2` 的 14 行里只有 12 行可能拿到：`stembazstem` 需要**三段复合词**，
+  `forbiddenroot` 被我们更宽松的 `check` 直接判为正确（于是 `suggest` 提前返回空）。
+  这两条不是建议 pass 的问题，是判定引擎的已知缺口。
+
+**真实 en_US 成本（native release，`_build/native/release/build/cmd/main/main.exe`）**
+
+| 词典 | 装载 | 90 个常见错拼的建议 | 每建议 |
+|---|---|---|---|
+| 真实 `en_US.aff`（无 `PHONE`/`MAP`） | 61.0 ms | 1436 ms | ~15.3 ms |
+| 同上 + `phone.aff` 的 105 条 `PHONE` | 127.1 ms | 1522 ms | ~15.5 ms |
+| 同上 + 一张 `MAP` 表 | 62.1 ms | 1439 ms | ~15.3 ms |
+
+- 结论：**真实 `en_US` 不含 `PHONE`/`MAP`，因此装载与每条建议的成本都是 0 增量**。
+  强行加上 105 条 `PHONE` 时，装载 +66 ms（≈1.3 µs/词条），每条建议 +0.2 ms（约 1%），
+  可以接受；`MAP` 的开销在噪声内（~0.02 ms/条）。
+- 由于音码索引是装载时一次性建的，`suggest` 每条只多算一次 key + 一次哈希查找。
+
+**仍未做**：`MAXNGRAMSUGS` / ngram 相似度没有实现（任务把它列为「有余力再做」）。
+剩下的 40 个未命中里，`forceucase`(2)、`i54633`(2)、`1463589*`(8)、`opentaal_keepcase`(7)
+很可能主要靠 ngram 与距离 2 的扩展。本轮选择把余下时间放在测试、成本实测与文档上，
+没有硬塞一个半成品 ngram。
+
+**AI 使用方式（本日）**
+- `PHONE` 的语义不是从 Hunspell 源码抄的（LGPL，章程禁止）。证据链是：本地
+  `hunspell(5)` man page 只写「算法借自 Aspell，详见 Aspell 手册」→ 去读 Debian 上
+  Aspell 0.60.8 的 “Phonetic Code” 章节（文档，非代码）→ 用自己写的
+  `kaatt`/`cat` 与大小写三个用例把「丢字符 / `-` / `<` / 优先级 / 大小写打扮」逐条钉住。
+- 每个 pass 做完立刻重跑**三个 `.sug` 数字 + `.good`/`.wrong`**，不做完两项就一起测，
+  否则无法归因。
+- `*` 形式的 `ph:` 一开始只去掉了词尾、忘了 pattern 的尾字符，是自写的
+  `prity → pretty` 用例抓出来的——再次说明只有跑出来的结果算数。
+
+---
+
 ## 待续

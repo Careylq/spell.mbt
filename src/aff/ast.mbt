@@ -76,6 +76,18 @@ pub(all) struct Replacement {
 } derive(Eq, @debug.Debug)
 
 ///|
+/// One `PHONE` phonetic-transcription rule.
+///
+/// Both fields are stored verbatim. The pattern uses the Aspell/Hunspell
+/// mini-language documented in the `hunspell(5)` manual (`(class)` character
+/// classes, leading/trailing `-`, `<`, digit priorities, `^`, `$`); `_` as a
+/// replacement means "output nothing".
+pub(all) struct PhoneRule {
+  pattern : String
+  replacement : String
+} derive(Eq, @debug.Debug)
+
+///|
 /// One `ICONV`/`OCONV` conversion pair.
 ///
 /// `from`/`to` are stored verbatim. For `ICONV` a trailing `_` in `from` is the
@@ -132,6 +144,12 @@ pub(all) struct AffFile {
   morph_aliases : Array[String]
   /// `REP` replacement pairs, in source order.
   replacements : Array[Replacement]
+  /// `MAP` groups, in source order. Each entry is one `MAP` body line stored
+  /// verbatim: a run of single characters (and/or parenthesized character
+  /// sequences) that are considered interchangeable when suggesting.
+  map_groups : Array[String]
+  /// `PHONE` phonetic-transcription rules, in source order.
+  phone_rules : Array[PhoneRule]
   /// `ICONV` input-conversion pairs, in source order. Applied to the word being
   /// checked before any lookup (never to dictionary entries).
   iconv : Array[Conversion]

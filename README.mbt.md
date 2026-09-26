@@ -11,11 +11,11 @@ for the words it rejects.
 > code block below is verified by `moon check`. `README.md` is a symlink to this file
 > so that GitHub renders it.
 
-> **Status: 0.5.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
+> **Status: 0.6.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
 > judgement engine, the suggestion engine, the public API and the `check` /
 > `suggest` CLI subcommands are implemented and tested on all four backends. See
 > [Not implemented yet](#not-implemented-yet) for what suggestion generation
-> still leaves out (phonetic/ngram candidates in particular).
+> still leaves out (ngram/`MAXNGRAMSUGS` candidates in particular).
 
 ## Conformance
 
@@ -29,7 +29,7 @@ actual run of the harness, not an estimate.
 |---|---|---|---|
 | `.good` (must be accepted) | 730 | 848 | 86.1% |
 | `.wrong` (must be rejected) | 579 | 613 | 94.5% |
-| `.sug` (expected best suggestion produced) | 108 | 173 | 62.4% |
+| `.sug` (expected best suggestion produced) | 133 | 173 | 76.9% |
 
 The `.sug` row is measured by `bash conformance/suggest.sh`, which is **additive** and
 never touches the `.good`/`.wrong` computation. A `.sug` line holds the suggestions
@@ -42,17 +42,22 @@ line-by-line positional pairing is impossible. Exactly what was counted:
   suggestion list this library returned for some wrong word, matched to a **distinct**
   wrong word in input order (a maximum monotone matching, so each expected line is used
   at most once and ordering is respected). Ranking within our list is therefore not
-  required to pass this row. 108/173 = 62.4%.
+  required to pass this row. 133/173 = 76.9%.
 * For reference, the stricter "our first suggestion equals the expected best
-  suggestion" is 93/173 = 53.8%, and reproducing a whole `.sug` file exactly —
+  suggestion" is 118/173 = 68.2%, and reproducing a whole `.sug` file exactly —
   Hunspell's own test criterion, in order and with no extra suggestion — holds for
-  **5/37 suites** (13.5%).
+  **7/37 suites** (18.9%).
 
-The row is partial because Hunspell's extra suggestion passes are deliberately out of
-scope: the phonetic `ph:`/`PHONE` tables (`ph`, `ph2`, `phone`, 21 of the 65 misses),
-`MAP` accents (`map`/`maputf`, 6), `OCONV` (`oconv`, 3), `FORCEUCASE` (`forceucase`, 2)
-and the ngram/`MAXNGRAMSUGS` candidate generator. Where the corpus needs those the
-library returns fewer (or no) suggestions; it never invents one `check` rejects.
+The `MAP` related-character groups and the `ph:`/`PHONE` phonetic passes are now
+implemented, which is where most of the improvement came from: `map` and `maputf` went
+from 0/3 to 3/3 each, `ph` from 3/11 to 11/11 and `ph2` from 1/14 to 12/14. The
+remaining `.sug` gap is dominated by the passes that are still out of scope: the
+ngram/`MAXNGRAMSUGS` candidate generator, `FORCEUCASE`-driven suggestions, and the
+places where the judgement engine is more permissive than Hunspell: one `ph2` line
+(`forbiddenroot`) is *accepted* by `check`, so no suggestion is produced at all, and
+another (`stembazstem`) needs a three-part compound that `check` still rejects. Where
+the corpus needs those, the library returns fewer (or no) suggestions; it never
+invents one `check` rejects.
 
 The remaining `.good` gap is dominated by the compound engines this release still
 leaves partial: `COMPOUNDMIDDLE`, `CHECKCOMPOUNDPATTERN`, affixed parts inside
@@ -345,6 +350,18 @@ list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`
   * **`REP` replacements** from the `.aff`, applied at every occurrence, on the word and
     its lower-case form, with `^`/`$` anchors and `_` as a space (`phorm` → `form`,
     `alot` → `a lot`);
+  * the **`ph:` "inner REP table"** — every `.dic` field `ph:value` becomes a
+    replacement rule `value` → the entry's word, in dictionary order, in the capitalised
+    and ALL-CAPS spellings too. The manual's three forms are handled: plain
+    (`which ph:wich`), the trailing `*` that strips the last character of both sides
+    (`pretty ph:prity*` behaves as `prit` → `prett`) and the explicit `->` form
+    (`happy ph:hepi->happi`). A word pair is a real word with a space
+    (`a lot ph:alot` suggests `a lot`, and its flags come from its last token);
+  * **`MAP` related-character groups** — each group (`MAP uü`, `MAP ß(ss)`) lets any
+    member be replaced by any other member, at several positions of the same word, so
+    `Fruhstuck` → `Frühstück` (two `u` → `ü`) and `gross` → `groß` (`ss` → `ß`) are
+    reachable. A parenthesized run is one multi-character alternative, and the recursion
+    is budgeted so a pathological table cannot stall the engine;
   * **edit distance 1** — deletions, adjacent transpositions, replacements and insertions,
     with replacements/insertions restricted to the `TRY` characters (an ASCII alphabet when
     `TRY` is absent);
@@ -354,10 +371,18 @@ list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`
   * a **bounded edit distance 2**: double deletion, long swap, single-character move and
     two independent adjacent transpositions — the kinds the manual names, O(n²) rather
     than O(n²·|TRY|²), so it stays cheap;
+  * the **`PHONE` phonetic pass** — the Aspell-derived table-driven transcription is
+    implemented (character classes, `-` retention, `<` re-scan, digit priorities, `^`/`$`
+    anchors, `_` as the empty output) and every dictionary word is indexed by its key
+    once at load time; a `.dic` `ph:` field is that entry's key (`xxxxxxxxxx ph:Brasilia`
+    is pronounced like `Brasilia`). Candidates are dressed in the input's capitalisation
+    (`kt` → `cat`, `Kt` → `Cat`, `KT` → `CAT`). A dictionary with no `PHONE` line skips
+    the pass and pays nothing;
   * **ranking and filtering** — every candidate must be accepted by `check` and must not be
-    a `NOSUGGEST` entry; results are deduplicated, the input word is never returned, and
-    `REP` hits rank first, then keyboard-adjacent (via `KEY`) typos, then early `TRY`
-    characters, then shorter edit distance, with an alphabetical tiebreak.
+    a `NOSUGGEST` entry; results are deduplicated, the input word is never returned,
+    `REP`/`ph:` hits rank first, then keyboard-adjacent (via `KEY`) typos, then early `TRY`
+    characters, then shorter edit distance, with the phonetic candidates last, and an
+    alphabetical tiebreak.
 - **Public façade** — `src/api` plus a re-export from the module root: `load`, `check`,
   `suggest`, `encoding`, `flag_type_name`, `rule_count`, `entry_count`.
 - **Runnable example** in `examples/basic`.
@@ -382,11 +407,14 @@ each of wasm, wasm-gc, js and native.
 - **Unicode upper-casing** — lowercasing uses `moonbitlang/x/unicode`, but upper-casing
   is ASCII-only, so a non-ASCII first letter is not capitalised (`dotless_i` and the
   Turkish/Azeri casing rules). `CHECKSHARPS` covers German `ß` explicitly.
-- **Suggestion quality beyond the implemented passes** — the phonetic `PHONE`/`ph:` tables
-  and `MAP` accents are not used, `OCONV` is not applied, `FORCEUCASE` does not drive a
-  suggestion, and there is no ngram/`MAXNGRAMSUGS` candidate generator. Edit distance 2 is
-  only the bounded O(n²) subset listed above (no two arbitrary replacements, no
-  replacement-plus-insertion). This is why `.sug` is at 62.4% rather than higher.
+- **Suggestion quality beyond the implemented passes** — there is no
+  ngram/`MAXNGRAMSUGS` candidate generator (`MAXNGRAMSUGS` is still only an unknown
+  directive, which is harmless while the generator itself is absent), and `FORCEUCASE`
+  does not drive a suggestion. Edit distance 2 is only the bounded O(n²) subset listed
+  above (no two arbitrary replacements, no replacement-plus-insertion). The `PHONE` pass
+  treats a `^^` pattern as a plain start anchor followed by re-scanning from the end of
+  the match instead of a fully separate sub-word (no corpus table uses `^^`). This is why
+  `.sug` is at 76.9% rather than higher.
 - FFI bindings to the Hunspell C++ library. The parsing, affix, judgement and suggestion
   logic is written from scratch in MoonBit and links against no speller — see
   [Native code](#native-code) for the one exception, a small stdin shim in the CLI.

@@ -24,6 +24,8 @@ pub(all) struct DicEntry {
   word : String
   flags : Array[String]
   morph : Array[String]
+  full_word : String
+  full_flags : Array[String]
 } derive(Eq, @debug.Debug)
 
 pub(all) struct DicFile {

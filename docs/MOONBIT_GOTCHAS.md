@@ -321,6 +321,46 @@ printf 'hello\nzzzz\n' | moon run cmd/main -- check --aff a.aff --dic d.dic --wo
 
 ---
 
+## 34. 返回 `T?` 的函数不能用裸结构体字面量收尾（4028）
+
+- **症状**：写
+  ```moonbit
+  fn parse_rule(raw : Raw) -> Rule? {
+    ...
+    { base, replacement, }   // 想让函数返回 Some(...)
+  }
+  ```
+  编译器报 `[4028] This expression has type Rule?, which is a variant type and not a
+  struct.`——它按**函数返回类型**去检查尾表达式，于是 `{...}` 被当成 `Option` 的构造子。
+- **正确写法**：显式 `Some({ ... })`。
+- **注意**：只在尾表达式位置出现；`let r : Rule = { ... }` 或 `return { ... }`（返回非
+  Option）都没问题。所以"把最后一行包一层 `Some`"是最便宜的修法。
+- 实测：`src/spell/phonet.mbt` 的 `parse_phonet_rule` 就踩了这条。
+
+## 35. 新增一个 `pub(all) struct` + `derive` 就必须同时补 `extends.mbt`（0079 的延伸）
+
+- **症状**：给 `.aff` AST 加一个 `pub(all) struct PhoneRule { ... } derive(Eq, @debug.Debug)`，
+  `moon check --deny-warn` 直接失败在 `implicit_impl_as_method`（0079）：
+  `equal`/`not_equal`/`to_repr` 被隐式提升成普通方法。
+- **原因**：第 2 条不是"`derive` 本身有罪"，而是**每个 derive 的公开类型都需要一对显式
+  `pub extend` 块**（本项目统一放在 `src/aff/extends.mbt`）。之前 AST 里每个类型都补过，
+  新加一个类型就补一个新的，否则 warning 变 error。
+- **正确写法**（照抄同文件里 `Replacement` 的两块即可）：
+  ```moonbit
+  #deprecated("Use the `==` operator instead", skip_current_package=true)
+  #doc(hidden)
+  pub extend PhoneRule with Eq::{equal, not_equal}
+
+  #deprecated("Use @debug.debug_inspect instead", skip_current_package=true)
+  #doc(hidden)
+  pub extend PhoneRule with @debug.Debug::{to_repr}
+  ```
+- **顺带**：`pub struct` 的私有字段类型也必须 `pub`（第 26 条）。本轮把音码表存进
+  `Dictionary` 时，解析后的 `PhonetRule` / `PhonetTable` 因此只能是 `pub struct`
+  （字段仍私有，`.mbti` 里只多两个不透明类型名，和 `SpellRule` 同一套路）。
+
+---
+
 ## 附二：实现过程中被测试抓出来的两个真 bug（值得记住）
 
 这两条是**语义性错误**，不是语法错误——编译器不会报，只有测试能抓：

@@ -42,10 +42,7 @@ fn conversion_pattern(from : String) -> (String, Bool) {
 /// Order two conversion pairs the way the matcher needs them: longest pattern
 /// first, then an end-anchored pattern before an unanchored one of the same
 /// length, then a total tiebreak so the order is deterministic.
-fn compare_conversions(
-  left : @aff.Conversion,
-  right : @aff.Conversion,
-) -> Int {
+fn compare_conversions(left : @aff.Conversion, right : @aff.Conversion) -> Int {
   let (left_pattern, left_at_end) = conversion_pattern(left.from)
   let (right_pattern, right_at_end) = conversion_pattern(right.from)
   let left_length = left_pattern.char_length()

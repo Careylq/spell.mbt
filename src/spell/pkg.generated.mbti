@@ -36,14 +36,22 @@ pub struct Dictionary {
   try_chars : String
   keyboard : String
   replacements : Array[@aff.Replacement]
+  suggestion_replacements : Array[@aff.Replacement]
+  map_groups : Array[String]
+  phone_rules : Array[@aff.PhoneRule]
+  phonet : PhonetTable
+  iconv : Array[@aff.Conversion]
+  oconv : Array[@aff.Conversion]
   nosuggest : String?
   ignore_chars : Array[Char]
   check_sharps : Bool
+  complex_prefixes : Bool
   break_patterns : Array[String]
   encoding : String
   flag_type : @aff.FlagType
   rule_count : Int
 }
+pub fn Dictionary::apply_oconv(Self, String) -> String
 pub fn Dictionary::check(Self, String) -> Bool
 pub fn Dictionary::encoding(Self) -> String
 pub fn Dictionary::entry_count(Self) -> Int
@@ -51,10 +59,32 @@ pub fn Dictionary::flag_type(Self) -> @aff.FlagType
 pub fn Dictionary::from_text(String, String) -> Self raise SpellError
 pub fn Dictionary::is_no_suggest(Self, String) -> Bool
 pub fn Dictionary::keyboard(Self) -> String
+pub fn Dictionary::map_groups(Self) -> Array[String]
+pub fn Dictionary::phone_rules(Self) -> Array[@aff.PhoneRule]
+pub fn Dictionary::phonetic_key(Self, String) -> String
+pub fn Dictionary::phonetic_words(Self, String) -> Array[String]
 pub fn Dictionary::replacements(Self) -> Array[@aff.Replacement]
 pub fn Dictionary::rule_count(Self) -> Int
+pub fn Dictionary::suggestion_replacements(Self) -> Array[@aff.Replacement]
 pub fn Dictionary::try_chars(Self) -> String
 pub fn Dictionary::word_chars(Self) -> String
+
+pub struct PhonetRule {
+  base : Array[Char]
+  class_chars : Array[Char]
+  has_class : Bool
+  dashes : Int
+  follow : Bool
+  start_anchor : Bool
+  end_anchor : Bool
+  priority : Int
+  replacement : String
+}
+
+pub struct PhonetTable {
+  by_initial : Map[Char, Array[PhonetRule]]
+  index : Map[String, Array[String]]
+}
 
 pub struct SpellRule {
   rule : @aff.AffixRule

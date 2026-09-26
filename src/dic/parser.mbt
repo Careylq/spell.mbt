@@ -125,13 +125,61 @@ fn parse_entry(line : DicLine, flag_type : @aff.FlagType) -> DicEntry {
     Some(raw) => decode_flags(raw, flag_type)
     None => ([] : Array[String])
   }
-  let morph : Array[String] = []
+  // The morphological fields start at the first colon-bearing token (Hunspell
+  // writes them as `po:`, `ph:`, `st:`, ...); everything before it belongs to
+  // the word, so `a lot ph:alot` is the word `a lot` with one morph field.
+  let mut field_start = tokens.length()
   let mut index = 1
+  while index < tokens.length() {
+    if field_start == tokens.length() && tokens[index].contains(":") {
+      field_start = index
+    }
+    index = index + 1
+  }
+  let morph : Array[String] = []
+  index = field_start
   while index < tokens.length() {
     morph.push(tokens[index])
     index = index + 1
   }
-  { word, flags, morph, }
+  let full_word = if field_start <= 1 {
+    word
+  } else {
+    full_word_of(tokens, field_start)
+  }
+  // A word pair carries its flags on the last word token (`black bird/S`), so
+  // the whole-spelling alias needs those, not the first field's flags.
+  let full_flags = if field_start <= 1 {
+    flags
+  } else {
+    match split_word_flags(tokens[field_start - 1]) {
+      (_, Some(raw)) => decode_flags(raw, flag_type)
+      (_, None) => ([] : Array[String])
+    }
+  }
+  { word, flags, morph, full_word, full_flags, }
+}
+
+///|
+/// The word part of an entry line: the `count` tokens before the first
+/// morphological field, joined by single spaces, with the `/FLAGS` suffix cut
+/// off the last one (`forbidden root/A` -> `forbidden root`).
+fn full_word_of(tokens : Array[String], count : Int) -> String {
+  let buffer = StringBuilder()
+  let mut index = 0
+  while index < count {
+    if index > 0 {
+      buffer.write_char(' ')
+    }
+    if index + 1 == count {
+      let (word, _) = split_word_flags(tokens[index])
+      buffer.write_string(word)
+    } else {
+      buffer.write_string(tokens[index])
+    }
+    index = index + 1
+  }
+  buffer.to_string()
 }
 
 ///|

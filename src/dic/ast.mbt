@@ -17,6 +17,19 @@ pub(all) struct DicEntry {
   flags : Array[String]
   /// Morphological fields (`po:`, `ds:`, `is:`, ...) in source order.
   morph : Array[String]
+  /// The whole word as written, before the first morphological field.
+  ///
+  /// A `.dic` entry may be a word pair (`a lot ph:alot`): the first
+  /// colon-bearing token starts the morphological fields and everything before
+  /// it — with the `/FLAGS` suffix stripped from the last token — is one word.
+  /// `word` deliberately stays the first whitespace-separated field because the
+  /// judgement engine relies on that; `full_word` is what the `ph:` suggestion
+  /// rules point at.
+  full_word : String
+  /// The flags of the last word token (`black bird/S` is the word `black bird`
+  /// with the flags `S`), which is where a word pair's flags are written. Equal
+  /// to `flags` for an entry whose word is a single field.
+  full_flags : Array[String]
 } derive(Eq, @debug.Debug)
 
 ///|

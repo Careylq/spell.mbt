@@ -67,6 +67,22 @@ pub struct Dictionary {
   /// `REP`: the replacement pairs, in source order. `_` still stands for a space
   /// (the parser keeps it verbatim); the suggestion engine interprets it.
   replacements : Array[@aff.Replacement]
+  /// `REP` plus the rules derived from the `.dic` `ph:` fields, in source order.
+  /// The `ph:` fields are the manual's "inner REP table": a `ph:` value names a
+  /// transliteration of the word, so `which ph:wich` suggests `which` for
+  /// `wich`. Built once at load time.
+  suggestion_replacements : Array[@aff.Replacement]
+  /// `MAP` groups, verbatim, in source order. The suggestion engine expands each
+  /// group into "replace any member by any other member".
+  map_groups : Array[String]
+  /// `PHONE` phonetic-transcription rules, in source order. Empty when the
+  /// `.aff` file has none, in which case the phonetic pass is skipped entirely.
+  phone_rules : Array[@aff.PhoneRule]
+  /// The parsed `PHONE` table and the phonetic key -> words index, built once at
+  /// load time. Empty when there are no `PHONE` rules (so a dictionary that does
+  /// not use them pays nothing). A word whose `.dic` entry carries a `ph:` field
+  /// is indexed under that field instead of a computed key.
+  phonet : PhonetTable
   /// `ICONV`: the input-conversion table, already in matching order. Applied to
   /// the word being checked (`check`) and never to dictionary entries.
   iconv : Array[@aff.Conversion]
@@ -145,6 +161,27 @@ pub fn Dictionary::from_text(
         entries[word] = homonyms
       }
     }
+    // A word pair such as `a lot ph:alot` or `forbidden root/A ph:...` is one
+    // dictionary word spelled with a space. `word` above stays the first field
+    // (the judgement index leans on it), but the whole spelling is registered
+    // too, with the flags written on its last token, so that a `ph:` suggestion
+    // can pass `check`.
+    let full = remove_ignored(entry.full_word, ignore_chars)
+    if full != word {
+      let full_flags : Array[String] = []
+      for flag in entry.full_flags {
+        for resolved in resolve_alias(aff.flag_aliases, flag, aff.flag_type) {
+          full_flags.push(resolved)
+        }
+      }
+      match entries.get(full) {
+        Some(existing) => existing.push(full_flags)
+        None => {
+          let homonyms : Array[Array[String]] = [full_flags]
+          entries[full] = homonyms
+        }
+      }
+    }
   }
   let prefix_rules : Array[SpellRule] = []
   let suffix_rules : Array[SpellRule] = []
@@ -188,6 +225,14 @@ pub fn Dictionary::from_text(
     try_chars: aff.try_chars,
     keyboard: aff.keyboard,
     replacements: aff.replacements,
+    suggestion_replacements: suggest_replacements(
+      aff.replacements,
+      dic.entries,
+      ignore_chars,
+    ),
+    map_groups: aff.map_groups,
+    phone_rules: aff.phone_rules,
+    phonet: build_phonetic_table(dic.entries, ignore_chars, aff.phone_rules),
     iconv: prepare_conversions(aff.iconv),
     oconv: prepare_conversions(aff.oconv),
     nosuggest: special.nosuggest,
@@ -414,6 +459,28 @@ pub fn Dictionary::word_chars(self : Dictionary) -> String {
 /// is what interprets it.
 pub fn Dictionary::replacements(self : Dictionary) -> Array[@aff.Replacement] {
   self.replacements
+}
+
+///|
+/// The full suggestion replacement table: `REP` followed by the rules derived
+/// from the `.dic` `ph:` fields, in source order.
+pub fn Dictionary::suggestion_replacements(
+  self : Dictionary,
+) -> Array[@aff.Replacement] {
+  self.suggestion_replacements
+}
+
+///|
+/// The `MAP` groups verbatim, in source order; empty when the `.aff` file has
+/// none. Each entry is one `MAP` body line, e.g. `uü` or `ß(ss)`.
+pub fn Dictionary::map_groups(self : Dictionary) -> Array[String] {
+  self.map_groups
+}
+
+///|
+/// The `PHONE` rules in source order; empty when the `.aff` file has none.
+pub fn Dictionary::phone_rules(self : Dictionary) -> Array[@aff.PhoneRule] {
+  self.phone_rules
 }
 
 ///|
