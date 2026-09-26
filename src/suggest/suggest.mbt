@@ -787,6 +787,12 @@ fn collect_splits(
 /// kept only when `check` accepts it, then ranked (`REP` first, then keyboard
 /// adjacency, `TRY` order, edit distance, and an alphabetical tiebreak) and
 /// deduplicated. The input word itself is never returned.
+///
+/// The winning suggestions are then passed through the `.aff` `OCONV` output
+/// conversion table, exactly as Hunspell converts suggestion output (the
+/// `oconv` suite expects `bébé` to be offered as `BÉBÉ`). Deduplication happens
+/// on the converted text, so two entries that convert to the same string are
+/// offered once.
 pub fn suggest(
   dict : @spell.Dictionary,
   word : String,
@@ -807,8 +813,9 @@ pub fn suggest(
   candidates.sort_by(compare_candidates)
   let out : Array[String] = []
   for candidate in candidates {
-    if !out.contains(candidate.word) {
-      out.push(candidate.word)
+    let converted = dict.apply_oconv(candidate.word)
+    if !out.contains(converted) {
+      out.push(converted)
       if out.length() >= limit {
         break
       }

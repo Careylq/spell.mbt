@@ -67,6 +67,12 @@ pub struct Dictionary {
   /// `REP`: the replacement pairs, in source order. `_` still stands for a space
   /// (the parser keeps it verbatim); the suggestion engine interprets it.
   replacements : Array[@aff.Replacement]
+  /// `ICONV`: the input-conversion table, already in matching order. Applied to
+  /// the word being checked (`check`) and never to dictionary entries.
+  iconv : Array[@aff.Conversion]
+  /// `OCONV`: the output-conversion table, already in matching order. Applied to
+  /// suggestion output only (`Dictionary::apply_oconv`).
+  oconv : Array[@aff.Conversion]
   /// `NOSUGGEST`: a word carrying this flag is never offered as a suggestion.
   nosuggest : String?
   /// The characters listed by the `IGNORE` directive, as code points. They are
@@ -76,6 +82,11 @@ pub struct Dictionary {
   /// `CHECKSHARPS`: an uppercase word may spell a dictionary `ß` as `SS`, and a
   /// `KEEPCASE` entry containing `ß` may be capitalised or uppercased.
   check_sharps : Bool
+  /// `COMPLEXPREFIXES`: when set, `affix_hit` allows a second prefix whose flag
+  /// the inner prefix's continuation flags supply, and refuses twofold suffix
+  /// stacking (the manual's "twofold prefix matching, but only one suffix level
+  /// instead of the default two").
+  complex_prefixes : Bool
   /// The `BREAK` patterns: where a word may be split into two separately
   /// correct parts (`check_breaks`). When the `.aff` has no `BREAK` line this
   /// holds Hunspell's default (`-`, `^-`, `-$`); `BREAK 0` leaves it empty.
@@ -177,9 +188,12 @@ pub fn Dictionary::from_text(
     try_chars: aff.try_chars,
     keyboard: aff.keyboard,
     replacements: aff.replacements,
+    iconv: prepare_conversions(aff.iconv),
+    oconv: prepare_conversions(aff.oconv),
     nosuggest: special.nosuggest,
     ignore_chars,
     check_sharps: aff.check_sharps,
+    complex_prefixes: aff.complex_prefixes,
     break_patterns: if aff.breaks_declared {
       aff.break_patterns
     } else {
@@ -412,4 +426,14 @@ pub fn Dictionary::is_no_suggest(self : Dictionary, word : String) -> Bool {
     }
   }
   false
+}
+
+///|
+/// Apply the `.aff` `OCONV` output-conversion table to `text`.
+///
+/// Hunspell only ever converts *output* with this table — the spell-checking
+/// judgement is unaffected — so the suggestion engine calls this on each
+/// suggestion it is about to return.
+pub fn Dictionary::apply_oconv(self : Dictionary, text : String) -> String {
+  apply_conversion(self.oconv, text)
 }

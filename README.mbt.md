@@ -27,7 +27,7 @@ actual run of the harness, not an estimate.
 
 | Metric | Passing | Total | Pass rate |
 |---|---|---|---|
-| `.good` (must be accepted) | 718 | 848 | 84.7% |
+| `.good` (must be accepted) | 730 | 848 | 86.1% |
 | `.wrong` (must be rejected) | 579 | 613 | 94.5% |
 | `.sug` (expected best suggestion produced) | 108 | 173 | 62.4% |
 
@@ -57,10 +57,9 @@ library returns fewer (or no) suggestions; it never invents one `check` rejects.
 The remaining `.good` gap is dominated by the compound engines this release still
 leaves partial: `COMPOUNDMIDDLE`, `CHECKCOMPOUNDPATTERN`, affixed parts inside
 compounds and the German `COMPOUNDBEGIN`/`COMPOUNDMIDDLE`/`COMPOUNDEND` suites
-(`germancompounding` and `germancompoundingold` alone account for 26 of the 130
-missing words). After that come the `ICONV`/`OCONV` conversion tables
-(`iconv*`/`oconv*`), `COMPLEXPREFIXES` (twofold prefix stripping), and the
-Hungarian `COMPOUNDSYLLABLE`/`COMPOUNDFORBIDFLAG` rules. The `.wrong` column is
+(`germancompounding` and `germancompoundingold` alone account for 26 of the 118
+missing words). After that come `COMPLEXPREFIXES` (twofold prefix stripping) and
+the Hungarian `COMPOUNDSYLLABLE`/`COMPOUNDFORBIDFLAG` rules. The `.wrong` column is
 the stronger result: only 34 of 613 words that must be rejected are wrongly
 accepted. Run `bash conformance/run.sh` locally to reproduce.
 
@@ -285,9 +284,9 @@ list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`
 ### Implemented
 
 - **`.aff` parser** — `SET`, `FLAG`, `AF`, `AM`, `PFX`, `SFX`, `REP`, `TRY`, `KEY`,
-  `IGNORE`, `WORDCHARS`, `CHECKSHARPS`, `BREAK`, `COMPOUND*`, and the special-flag
-  directives (`NOSUGGEST`, `KEEPCASE`, `FORBIDDENWORD`, `NEEDAFFIX`, `CIRCUMFIX`,
-  `ONLYINCOMPOUND`).
+  `IGNORE`, `WORDCHARS`, `CHECKSHARPS`, `BREAK`, `ICONV`/`OCONV`, `COMPOUND*`, and the
+  special-flag directives (`NOSUGGEST`, `KEEPCASE`, `FORBIDDENWORD`, `NEEDAFFIX`,
+  `CIRCUMFIX`, `ONLYINCOMPOUND`).
   Unmodelled directives are collected in an `unrecognized` list rather than dropped.
   Errors carry 1-based line numbers.
 - **`.dic` parser** — entry count (text after the count on the same line is ignored, as
@@ -377,8 +376,6 @@ each of wasm, wasm-gc, js and native.
   still lose words.
 - **`COMPLEXPREFIXES`** (twofold prefix stripping, needed by `alias3` and
   `complexprefixes*`).
-- **`ICONV`/`OCONV`** conversion tables — parsed but not applied, so the `iconv*`/
-  `oconv*` suites lose words.
 - **`FORCEUCASE`** and `NOSUGGEST` semantics at lookup time (both are parsed; `NOSUGGEST`
   is honoured when filtering suggestion candidates).
 - **`FULLSTRIP`, `PSEUDOROOT` and `COMPOUNDROOT`** handling.

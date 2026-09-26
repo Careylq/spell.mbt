@@ -10,8 +10,12 @@
 ///|
 /// Is `word` correct according to this dictionary?
 ///
-/// `IGNORE` characters are removed from `word` before anything else, exactly as
-/// they were removed from the dictionary's entries when it was built.
+/// The `.aff` `ICONV` input conversions are applied to `word` first, then
+/// `IGNORE` characters are removed, exactly as they were removed from the
+/// dictionary's entries when it was built. (Conversion comes first so that a
+/// rule may map a character onto one that `IGNORE` then drops; the `nepali`
+/// suite needs precisely that.) `ICONV` is never applied to dictionary entries —
+/// see `conversion.mbt` for the probe that establishes it.
 ///
 /// The word is then classified by capitalisation. Exact-case forms are looked up
 /// directly, then through the affix rules, then through the compounds; `Capitalised`
@@ -27,7 +31,8 @@
 ///
 /// An empty word is never correct (the CLI skips empty input lines entirely).
 pub fn Dictionary::check(self : Dictionary, word : String) -> Bool {
-  let cleaned = remove_ignored(word, self.ignore_chars)
+  let converted = apply_conversion(self.iconv, word)
+  let cleaned = remove_ignored(converted, self.ignore_chars)
   if cleaned.is_empty() {
     return false
   }

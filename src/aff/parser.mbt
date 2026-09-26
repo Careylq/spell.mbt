@@ -74,11 +74,14 @@ pub fn parse_aff(text : String) -> AffFile raise AffParseError {
           builder.replacements.push({ from, to, })
         }
       }
+      "ICONV" => index = parse_conversion(builder.iconv, lines, index, line)
+      "OCONV" => index = parse_conversion(builder.oconv, lines, index, line)
       "TRY" => builder.try_chars = arg_at(line, 1, name)
       "KEY" => builder.keyboard = arg_at(line, 1, name)
       "IGNORE" => builder.ignore_chars = arg_at(line, 1, name)
       "WORDCHARS" => builder.word_chars = arg_at(line, 1, name)
       "CHECKSHARPS" => builder.check_sharps = true
+      "COMPLEXPREFIXES" => builder.complex_prefixes = true
       "BREAK" => {
         let count = parse_count(arg_at(line, 1, name), line.number, name)
         builder.breaks_declared = true
@@ -148,11 +151,14 @@ priv struct AffBuilder {
   flag_aliases : Array[String]
   morph_aliases : Array[String]
   replacements : Array[Replacement]
+  iconv : Array[Conversion]
+  oconv : Array[Conversion]
   mut try_chars : String
   mut keyboard : String
   mut ignore_chars : String
   mut word_chars : String
   mut check_sharps : Bool
+  mut complex_prefixes : Bool
   mut breaks_declared : Bool
   break_patterns : Array[String]
   mut compound_min : Int
@@ -187,11 +193,14 @@ fn new_builder() -> AffBuilder {
     flag_aliases: [],
     morph_aliases: [],
     replacements: [],
+    iconv: [],
+    oconv: [],
     try_chars: "",
     keyboard: "",
     ignore_chars: "",
     word_chars: "",
     check_sharps: false,
+    complex_prefixes: false,
     breaks_declared: false,
     break_patterns: [],
     compound_min: 0,
@@ -234,11 +243,14 @@ fn finish(builder : AffBuilder) -> AffFile {
     flag_aliases: builder.flag_aliases,
     morph_aliases: builder.morph_aliases,
     replacements: builder.replacements,
+    iconv: builder.iconv,
+    oconv: builder.oconv,
     try_chars: builder.try_chars,
     keyboard: builder.keyboard,
     ignore_chars: builder.ignore_chars,
     word_chars: builder.word_chars,
     check_sharps: builder.check_sharps,
+    complex_prefixes: builder.complex_prefixes,
     breaks_declared: builder.breaks_declared,
     break_patterns: builder.break_patterns,
     compound_min: builder.compound_min,
@@ -296,6 +308,31 @@ fn parse_affix_block(
       condition,
       morph: tail_from(entry.tokens, 5),
     })
+  }
+  next
+}
+
+///|
+/// Parse one `ICONV`/`OCONV` conversion table (header line plus its declared
+/// body lines) into `out` and return the index just past the table.
+///
+/// The two fields are stored verbatim, exactly like `REP`: a trailing `_` in the
+/// `from` field is Hunspell's end-of-word marker and is interpreted by the
+/// consumer, and the body lines' trailing `#` comments are ignored because only
+/// the first two arguments are read.
+fn parse_conversion(
+  out : Array[Conversion],
+  lines : Array[AffLine],
+  start : Int,
+  line : AffLine,
+) -> Int raise AffParseError {
+  let name = line.tokens[0]
+  let count = parse_count(arg_at(line, 1, name), line.number, name)
+  let (body, next) = take_body(lines, start, name, count, line.number)
+  for entry in body {
+    let from = arg_at(entry, 1, name)
+    let to = arg_at(entry, 2, name)
+    out.push({ from, to, })
   }
   next
 }

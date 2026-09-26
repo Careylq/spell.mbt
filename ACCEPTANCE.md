@@ -17,8 +17,8 @@
 | 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | `NOTICE`：参考 Hunspell（LGPL-2.1）的**格式规范与可观察行为**，未复制源码；测试语料不随仓库分发 |
 
 **已实测的符合率**（`bash conformance/run.sh`，154 个测试套件）：
-`.good` **718/848 = 84.7%** ｜ `.wrong` **579/613 = 94.5%**
-未通过的 `.good` 集中在 README「Not implemented yet」中已明确列出的功能（复合词规则、词缀续接 flag、`IGNORE`、`COMPLEXPREFIXES`、完整 Unicode 大小写折叠）。
+`.good` **730/848 = 86.1%** ｜ `.wrong` **579/613 = 94.5%** ｜ `.sug` **108/173 = 62.4%**
+未通过的 `.good` 集中在 README「Not implemented yet」中已明确列出的功能（`COMPOUNDMIDDLE`/`CHECKCOMPOUNDPATTERN`、德语复合词、`COMPLEXPREFIXES`、完整 Unicode 大小写折叠）。
 
 **建议生成符合率**（`bash conformance/suggest.sh`，37 个 `.sug` 文件、173 行非空期望）：
 期望的最佳建议被产出 **108/173 = 62.4%**（按输入顺序做最大单调配对）；

@@ -76,6 +76,18 @@ pub(all) struct Replacement {
 } derive(Eq, @debug.Debug)
 
 ///|
+/// One `ICONV`/`OCONV` conversion pair.
+///
+/// `from`/`to` are stored verbatim. For `ICONV` a trailing `_` in `from` is the
+/// Hunspell "end of word" marker (`ICONV <ZWJ>_ x` applies only when `<ZWJ>` is
+/// the last character of the word, as the manual's `ICONV <200D>_ <FFF0>`
+/// example describes); the consumer strips and interprets it.
+pub(all) struct Conversion {
+  from : String
+  to : String
+} derive(Eq, @debug.Debug)
+
+///|
 /// The flag-valued directives that mark a word (or affix) as special.
 ///
 /// `None` means the directive was absent. Values are stored verbatim (see
@@ -120,6 +132,12 @@ pub(all) struct AffFile {
   morph_aliases : Array[String]
   /// `REP` replacement pairs, in source order.
   replacements : Array[Replacement]
+  /// `ICONV` input-conversion pairs, in source order. Applied to the word being
+  /// checked before any lookup (never to dictionary entries).
+  iconv : Array[Conversion]
+  /// `OCONV` output-conversion pairs, in source order. Applied to suggestion
+  /// output only.
+  oconv : Array[Conversion]
   try_chars : String
   keyboard : String
   ignore_chars : String
@@ -128,6 +146,11 @@ pub(all) struct AffFile {
   /// `KEEPCASE` word containing `ß` may be capitalised or uppercased (but its
   /// uppercased form may only use `SS`, never a sharp s).
   check_sharps : Bool
+  /// `COMPLEXPREFIXES`: twofold prefix matching is allowed, and only one suffix
+  /// level instead of the default two (the manual's wording). Hunspell 1.7.3
+  /// behaves exactly this way — a probe dictionary confirmed that twofold
+  /// suffix stacking stops working and twofold prefix stacking starts.
+  complex_prefixes : Bool
   /// Whether a `BREAK` directive appeared at all. `BREAK 0` declares "no break
   /// points", which is different from the directive being absent (Hunspell then
   /// breaks at `-`, `^-` and `-$`).

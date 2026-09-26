@@ -63,6 +63,16 @@ pub extend Replacement with @debug.Debug::{to_repr}
 ///|
 #deprecated("Use the `==` operator instead", skip_current_package=true)
 #doc(hidden)
+pub extend Conversion with Eq::{equal, not_equal}
+
+///|
+#deprecated("Use @debug.debug_inspect instead", skip_current_package=true)
+#doc(hidden)
+pub extend Conversion with @debug.Debug::{to_repr}
+
+///|
+#deprecated("Use the `==` operator instead", skip_current_package=true)
+#doc(hidden)
 pub extend SpecialFlags with Eq::{equal, not_equal}
 
 ///|

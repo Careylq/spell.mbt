@@ -476,4 +476,53 @@ bash conformance/pipe.sh --all              → 全部 ok
 
 ---
 
+## 2026-09-27 · Day 6 — `ICONV`/`OCONV`：一个有真实影响的缺口
+
+**背景**：离 9/30 验收只剩 3 天。这一轮原计划做 `ICONV`/`OCONV` → `COMPLEXPREFIXES` →
+`COMPOUNDMIDDLE`，但只完成了第一项就停了下来，所以这里如实记录**完成了一项**。
+
+**做了什么**
+- `src/spell/conversion.mbt`（新）：`ICONV`/`OCONV` 转换表。
+- `src/aff/`：解析 `ICONV n` / `OCONV n` 头行 + 声明条数的转换对；
+  `from` 的尾随 `_` 是 Hunspell 的"词尾标记"，语义按手册实现并写进类型注释。
+- `src/spell/dictionary.mbt`：存取 `iconv`/`oconv`，导出 `Dictionary::apply_oconv`。
+- `src/spell/lookup.mbt`：**先应用 `ICONV`、再做 `IGNORE` 过滤** —— 顺序很关键。
+- `src/suggest/suggest.mbt`：输出经 `OCONV` 转换。
+
+**为什么这一项优先级最高**：它不是"刷测试套件"，而是**真实词典就需要它**。
+真实的 LibreOffice `en_US.aff` 里有：
+```
+ICONV 1
+ICONV ’ '
+```
+也就是把弯撇号 `’`（U+2019）归一化成直撇号 `'` 再查词。
+
+**实测验证（真实词典）**：
+```
+don't → 1     don’t → 1        ← 两者都接受
+can't → 1     can’t → 1
+```
+`don't` / `can't` 确实在 `en_US.dic` 里（各 1 条），所以**修复前用弯撇号的写法会被误判为拼写错误**——
+这是本轮修掉的一个真实用户可见缺陷，不是测试套件里的数字游戏。
+
+**符合率增量**（脚本实测）：
+
+| 指标 | 本轮前 | 本轮后 |
+|---|---|---|
+| `.good` | 718/848 = 84.7% | **730/848 = 86.1%** |
+| `.wrong` | 579/613 = 94.5% | **579/613 = 94.5%**（不变） |
+
+净增 12 个词，`.wrong` 无回归。
+
+**仍未做**（时间所限，README 已列明）：`COMPLEXPREFIXES`、`COMPOUNDMIDDLE` /
+`CHECKCOMPOUNDPATTERN`、德语复合词（规则无法从语料 `.aff` 推导，缺 `LANG de_DE`）。
+
+**AI 使用方式（本日）**
+- 转换顺序（`ICONV` 先于 `IGNORE`）不是拍脑袋定的，是让实现方去核对语料里
+  `iconv*` / `ignore*` 两个 suite 的相对行为后确定的。
+- 收尾时我独立重跑了符合率（而不是采信汇报），并额外用**真实词典 + 弯撇号**做了
+  端到端验证——因为"符合率涨了 12 个词"不足以说明这个功能在真实场景下有用。
+
+---
+
 ## 待续
