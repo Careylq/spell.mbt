@@ -134,6 +134,9 @@ pub(all) struct UnknownDirective {
 pub(all) struct AffFile {
   encoding : String
   flag_type : FlagType
+  /// `LANG`: the language code, used for the Turkic `I`/`İ` casing rules
+  /// (`LANG tr`, `az`, `crh`). `""` when the directive is absent.
+  lang : String
   /// Headers of every `PFX`/`SFX` block, in source order.
   affix_headers : Array[AffixHeader]
   /// Every `PFX`/`SFX` rule line, in source order.
@@ -182,10 +185,29 @@ pub(all) struct AffFile {
   compound_end : String?
   compound_middle : String?
   compound_rules : Array[String]
+  /// `COMPOUNDPERMITFLAG`: an affix carrying this flag may sit *inside* a
+  /// compound (a prefix that is not at the very front, or a suffix that is not
+  /// at the very end). Affixes at those natural edges need no permit.
+  compound_permit : String?
+  /// `COMPOUNDFORBIDFLAG`: an affix carrying this flag forbids compounding of
+  /// the word it builds; a plain entry carrying it is removed from the first and
+  /// middle positions of a compound.
+  compound_forbid : String?
+  /// `FORCEUCASE`: a compound whose last part carries this flag is only correct
+  /// in a capitalised (or all-caps) spelling.
+  forceucase : String?
+  /// `COMPOUNDWORDMAX`: maximum number of parts in a compound (`0` = unlimited).
+  compound_word_max : Int
+  /// `COMPOUNDSYLLABLE max_syllable vowels`: Hungarian syllable-count limit;
+  /// `compound_syllable_max` is `0` when the directive is absent.
+  compound_syllable_max : Int
+  compound_syllable_vowels : String
   check_compound_dup : Bool
   check_compound_triple : Bool
   check_compound_repeat : Bool
   check_compound_simplified_triple : Bool
+  /// `CHECKCOMPOUNDCASE`: forbid upper-case characters at a compound boundary.
+  check_compound_case : Bool
   check_compound_pattern : Array[String]
   special_flags : SpecialFlags
   /// Directives with no typed field above, in source order.

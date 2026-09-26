@@ -211,18 +211,41 @@ fn matches_chars_at(
 /// through the folded form `42nd`.
 fn Dictionary::check_word(self : Dictionary, word : String) -> Bool {
   match classify_case(word, self.check_sharps) {
-    NoLetters | Lower => self.check_one(word, Exact)
+    NoLetters | Lower => self.check_one(word, Exact, false)
     Capitalized =>
-      self.check_one(word, Exact) ||
-      self.check_one(lower_word(word), Folded) ||
-      // `CHECKSHARPS`: a `KEEPCASE` word containing `ß` may be capitalised.
-      (self.check_sharps && self.lookup_word(lower_word(word), SharpsFolded))
+      self.check_one(word, Exact, true) ||
+      // A `FORBIDDENWORD` entry for the exact spelling also forbids the folded
+      // form (`Kg/X` forbids `Kg` even though `kg` exists).
+      (
+        !self.is_forbidden_word(word) &&
+        (
+          self.check_one(self.fold_lower(word), Folded, true) ||
+          // `CHECKSHARPS`: a `KEEPCASE` word containing `ß` may be capitalised.
+          (
+            self.check_sharps &&
+            self.lookup_word(self.fold_lower(word), SharpsFolded)
+          )
+        )
+      )
     AllCaps =>
-      self.check_one(word, Exact) ||
-      self.check_one(lower_word(word), Folded) ||
-      self.check_one(capitalise_word(word), Folded) ||
-      self.sharps_hit(word)
-    Mixed => self.check_one(word, Exact)
+      self.check_one(word, Exact, true) ||
+      (
+        !self.is_forbidden_word(word) &&
+        (
+          self.check_one(self.fold_lower(word), Folded, true) ||
+          self.check_one(self.fold_capitalise(word), Folded, true) ||
+          self.sharps_hit(word)
+        )
+      )
+    Mixed =>
+      self.check_one(word, Exact, false) ||
+      // An upper-case first letter on a mixed-case word may be the capitalised
+      // spelling of a dictionary word whose own first letter is lower-case
+      // (`ULinda` for `uLinda`, `gh106`).
+      (
+        is_upper_char(first_char(word)) &&
+        self.check_one(lower_first_word(word), Folded, false)
+      )
   }
 }
 
@@ -233,18 +256,60 @@ fn Dictionary::check_word(self : Dictionary, word : String) -> Bool {
 /// A `FORBIDDENWORD` entry subtracts its word from every accepted set, so a
 /// compound is only tried when the word itself is not forbidden
 /// (`foowordbar/F` must stay wrong even though `foo`, `word` and `bar` satisfy
-/// a `COMPOUNDRULE`).
+/// a `COMPOUNDRULE`). `orig_cap` records whether the word as typed had a
+/// capital letter, which `FORCEUCASE` compounds require.
 fn Dictionary::check_one(
   self : Dictionary,
   word : String,
   mode : MatchCase,
+  orig_cap : Bool,
 ) -> Bool {
   self.lookup_word(word, mode) ||
   self.is_number_word(word) ||
   (
     !self.is_forbidden_word(word) &&
-    (self.check_compound_rule(word, mode) || self.check_compound(word, mode))
+    !self.forbidden_derived(word) &&
+    (
+      self.check_compound_rule(word, mode) ||
+      self.check_compound(word, mode, orig_cap)
+    )
   )
+}
+
+///|
+/// Is `word` an affixed form of a `FORBIDDENWORD` entry?
+///
+/// The manual is explicit that "affixed forms are also forbidden", so
+/// `foowordbars` stays wrong when `foowordbar/F` is listed, even though
+/// `foo|word|bars` would otherwise satisfy the compound rules.
+fn Dictionary::forbidden_derived(self : Dictionary, word : String) -> Bool {
+  for rule in self.suffix_rules {
+    let rest = match word.strip_suffix(normalise_affix(rule.rule.add)) {
+      Some(view) => view.to_owned()
+      None => continue
+    }
+    let stem = rest + normalise_affix(rule.rule.strip)
+    if self.is_forbidden_word(stem) && self.entry_has_flag(stem, rule.rule.flag) {
+      match @affix.apply_rule(rule.rule, stem) {
+        Some(produced) => if produced == word { return true }
+        None => ()
+      }
+    }
+  }
+  for rule in self.prefix_rules {
+    let rest = match word.strip_prefix(normalise_affix(rule.rule.add)) {
+      Some(view) => view.to_owned()
+      None => continue
+    }
+    let stem = normalise_affix(rule.rule.strip) + rest
+    if self.is_forbidden_word(stem) && self.entry_has_flag(stem, rule.rule.flag) {
+      match @affix.apply_rule(rule.rule, stem) {
+        Some(produced) => if produced == word { return true }
+        None => ()
+      }
+    }
+  }
+  false
 }
 
 ///|
@@ -292,9 +357,13 @@ fn Dictionary::is_number_word(self : Dictionary, word : String) -> Bool {
 }
 
 ///|
-/// Is `c` an ASCII decimal digit?
+/// Is `c` a decimal digit? ASCII digits plus the two Arabic-Indic digit blocks,
+/// which Hunspell's `WORDCHARS` corpora use (`gh353` lists them so that a word
+/// made of those digits is accepted like any other number).
 fn is_digit_char(c : Char) -> Bool {
-  c >= '0' && c <= '9'
+  (c >= '0' && c <= '9') ||
+  (c >= '\u{0660}' && c <= '\u{0669}') ||
+  (c >= '\u{06F0}' && c <= '\u{06F9}')
 }
 
 ///|
@@ -368,7 +437,7 @@ fn Dictionary::sharps_hit(self : Dictionary, word : String) -> Bool {
   if !self.check_sharps {
     return false
   }
-  for base in [lower_word(word), capitalise_word(word)] {
+  for base in [self.fold_lower(word), self.fold_capitalise(word)] {
     for candidate in sharp_s_variants(base) {
       if self.lookup_word(candidate, SharpsFolded) {
         return true
@@ -480,10 +549,13 @@ fn Dictionary::direct_hit(
   word : String,
   mode : MatchCase,
 ) -> Bool {
-  if self.is_forbidden_word(word) {
-    return false
-  }
+  // A `FORBIDDENWORD` homonym only forbids *that* homonym: the manual's
+  // "excepts with root homonyms" means a word listed once as a root and once as
+  // forbidden (`foo/S` and `foo/YX`) is still accepted.
   for flags in self.homonyms(word) {
+    if has_flag(self.forbiddenword, flags) {
+      continue
+    }
     if !has_flag(self.needaffix, flags) &&
       !has_flag(self.onlyincompound, flags) &&
       !keepcase_blocks(mode, word, self.keepcase, flags) {
@@ -526,19 +598,79 @@ fn Dictionary::affix_hit(
       }
     }
   }
-  for outer in self.suffix_rules {
-    if self.derives_two_suffixes(outer, word, mode) {
-      return true
+  if self.complex_prefixes {
+    // `COMPLEXPREFIXES` trades the second suffix level for a second *prefix*
+    // level: the manual's "twofold prefix stripping (but single suffix
+    // stripping)". The inner prefix hands its continuation flags to the form
+    // it builds, and the outer prefix needs its flag there (`tekmetouro`).
+    for outer in self.prefix_rules {
+      if self.derives_two_prefixes(outer, word, mode) {
+        return true
+      }
     }
-  }
-  for prefix_rule in self.prefix_rules {
-    if prefix_rule.rule.cross_product {
-      for outer in self.suffix_rules {
-        if outer.rule.cross_product &&
-          self.derives_prefix_two_suffixes(prefix_rule, outer, word, mode) {
-          return true
+  } else {
+    for outer in self.suffix_rules {
+      if self.derives_two_suffixes(outer, word, mode) {
+        return true
+      }
+    }
+    for prefix_rule in self.prefix_rules {
+      if prefix_rule.rule.cross_product {
+        for outer in self.suffix_rules {
+          if outer.rule.cross_product &&
+            self.derives_prefix_two_suffixes(prefix_rule, outer, word, mode) {
+            return true
+          }
         }
       }
+    }
+  }
+  false
+}
+
+///|
+/// Can `outer` (a prefix rule) have produced `word` from a form that `inner`, a
+/// second prefix rule, built from a dictionary stem?
+///
+/// `word = outer.add + inner.add + stem`, and `outer`'s flag has to be available
+/// on the form it was attached to: on the stem itself or in `inner`'s
+/// continuation flags. This is what `COMPLEXPREFIXES` enables (`PFX B 0 met/A`
+/// lets `PFX A 0 tek` stack on top, giving `tekmetouro`).
+fn Dictionary::derives_two_prefixes(
+  self : Dictionary,
+  outer : SpellRule,
+  word : String,
+  mode : MatchCase,
+) -> Bool {
+  let mid = match word.strip_prefix(normalise_affix(outer.rule.add)) {
+    Some(view) => view.to_owned()
+    None => return false
+  }
+  for inner in self.prefix_rules {
+    let rest = match mid.strip_prefix(normalise_affix(inner.rule.add)) {
+      Some(view) => view.to_owned()
+      None => continue
+    }
+    let stem = normalise_affix(inner.rule.strip) + rest
+    if !self.stem_is_usable(stem, inner.rule.flag, mode) {
+      continue
+    }
+    if !self.flag_on_derived(stem, outer.rule.flag, inner.cont_flags) {
+      continue
+    }
+    if !self.derived_standalone([inner.cont_flags, outer.cont_flags]) {
+      continue
+    }
+    let produced_mid = match @affix.apply_rule(inner.rule, stem) {
+      Some(produced) => produced
+      None => continue
+    }
+    if produced_mid != mid {
+      continue
+    }
+    match @affix.apply_rule(outer.rule, mid) {
+      Some(produced) => if produced == word { return true }
+      None => ()
     }
   }
   false
@@ -552,6 +684,10 @@ fn Dictionary::derives_suffix(
   word : String,
   mode : MatchCase,
 ) -> Bool {
+  // `CIRCUMFIX`: a suffix carrying the flag needs a circumfix prefix too.
+  if has_flag(self.circumfix, rule.cont_flags) {
+    return false
+  }
   let rest = match word.strip_suffix(normalise_affix(rule.rule.add)) {
     Some(view) => view.to_owned()
     None => return false
@@ -578,6 +714,10 @@ fn Dictionary::derives_prefix(
   word : String,
   mode : MatchCase,
 ) -> Bool {
+  // `CIRCUMFIX`: a prefix carrying the flag needs a circumfix suffix too.
+  if has_flag(self.circumfix, rule.cont_flags) {
+    return false
+  }
   let rest = match word.strip_prefix(normalise_affix(rule.rule.add)) {
     Some(view) => view.to_owned()
     None => return false
@@ -609,11 +749,18 @@ fn Dictionary::derives_two_suffixes(
   word : String,
   mode : MatchCase,
 ) -> Bool {
+  // `CIRCUMFIX` needs a prefix; this path has none.
+  if has_flag(self.circumfix, outer.cont_flags) {
+    return false
+  }
   let mid = match word.strip_suffix(normalise_affix(outer.rule.add)) {
     Some(view) => view.to_owned()
     None => return false
   }
   for inner in self.suffix_rules {
+    if has_flag(self.circumfix, inner.cont_flags) {
+      continue
+    }
     let rest = match mid.strip_suffix(normalise_affix(inner.rule.add)) {
       Some(view) => view.to_owned()
       None => continue
@@ -667,7 +814,15 @@ fn Dictionary::derives_prefix_two_suffixes(
     Some(view) => view.to_owned()
     None => return false
   }
+  let prefix_cf = has_flag(self.circumfix, prefix_rule.cont_flags)
+  let outer_cf = has_flag(self.circumfix, outer.cont_flags)
   for inner in self.suffix_rules {
+    if !self.circumfix_ok(
+        prefix_cf,
+        outer_cf || has_flag(self.circumfix, inner.cont_flags),
+      ) {
+      continue
+    }
     let rest = match mid.strip_suffix(normalise_affix(inner.rule.add)) {
       Some(view) => view.to_owned()
       None => continue
@@ -786,6 +941,12 @@ fn Dictionary::derives_cross(
     core +
     normalise_affix(suffix_rule.rule.strip)
   if self.is_forbidden_word(stem) {
+    return false
+  }
+  if !self.circumfix_ok(
+      has_flag(self.circumfix, prefix_rule.cont_flags),
+      has_flag(self.circumfix, suffix_rule.cont_flags),
+    ) {
     return false
   }
   if !@affix.matches_condition(prefix_rule.rule.condition, stem, @aff.Prefix) {
@@ -909,6 +1070,24 @@ fn has_flag(maybe_flag : String?, flags : Array[String]) -> Bool {
 }
 
 ///|
+/// `CIRCUMFIX`: an affix carrying the flag may only be applied together with an
+/// affix of the opposite kind that carries it too. When neither side carries it
+/// the check passes.
+fn Dictionary::circumfix_ok(
+  self : Dictionary,
+  prefix_cf : Bool,
+  suffix_cf : Bool,
+) -> Bool {
+  if self.circumfix is None {
+    return true
+  }
+  if !prefix_cf && !suffix_cf {
+    return true
+  }
+  prefix_cf && suffix_cf
+}
+
+///|
 /// The format writes `0` for "nothing"; an empty string means the same thing.
 fn normalise_affix(text : String) -> String {
   if text == "0" {
@@ -916,75 +1095,6 @@ fn normalise_affix(text : String) -> String {
   } else {
     text
   }
-}
-
-///|
-/// Accept a word that splits into two dictionary words, each at least
-/// `COMPOUNDMIN` characters long.
-///
-/// The first part must carry `COMPOUNDFLAG` or `COMPOUNDBEGIN`, the last must
-/// carry `COMPOUNDFLAG` or `COMPOUNDEND`. This is the two-part case only:
-/// compounds of three or more parts, `COMPOUNDMIDDLE`, affixed parts and
-/// `CHECKCOMPOUNDPATTERN` are not handled.
-fn Dictionary::check_compound(
-  self : Dictionary,
-  word : String,
-  mode : MatchCase,
-) -> Bool {
-  if self.compound_flag is None &&
-    self.compound_begin is None &&
-    self.compound_end is None {
-    return false
-  }
-  let minimum = if self.compound_min <= 0 { 3 } else { self.compound_min }
-  let chars = word.to_array()
-  let total = chars.length()
-  if total < minimum * 2 {
-    return false
-  }
-  let mut split = minimum
-  while split <= total - minimum {
-    let left = chars_to_string(chars, 0, split)
-    let right = chars_to_string(chars, split, total)
-    let left_ok = self.compound_part_is_usable(left, self.compound_flag, mode) ||
-      self.compound_part_is_usable(left, self.compound_begin, mode)
-    let right_ok = self.compound_part_is_usable(right, self.compound_flag, mode) ||
-      self.compound_part_is_usable(right, self.compound_end, mode)
-    if left_ok && right_ok {
-      return true
-    }
-    split = split + 1
-  }
-  false
-}
-
-///|
-/// May `part` stand as one half of a compound under `flag` (which may be
-/// absent)?
-///
-/// A `KEEPCASE` part is only usable in an exact-case lookup: `TV-word` is wrong
-/// even though `tv-` and `word` form a compound.
-fn Dictionary::compound_part_is_usable(
-  self : Dictionary,
-  part : String,
-  flag : String?,
-  mode : MatchCase,
-) -> Bool {
-  let wanted = match flag {
-    None => return false
-    Some(flag) => flag
-  }
-  if self.is_forbidden_word(part) {
-    return false
-  }
-  for flags in self.homonyms(part) {
-    if flags.contains(wanted) &&
-      !has_flag(self.needaffix, flags) &&
-      !keepcase_blocks(mode, part, self.keepcase, flags) {
-      return true
-    }
-  }
-  false
 }
 
 ///|

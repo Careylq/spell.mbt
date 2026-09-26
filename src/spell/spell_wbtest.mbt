@@ -33,13 +33,19 @@ test "classify_case covers every shape" {
 }
 
 ///|
-test "lower_word and capitalise_word" {
-  assert_eq(lower_word("HELLO"), "hello")
-  assert_eq(lower_word("iPhone"), "iphone")
-  assert_eq(lower_word("café"), "café")
-  assert_eq(capitalise_word("HELLO"), "Hello")
-  assert_eq(capitalise_word("iphone"), "Iphone")
-  assert_eq(capitalise_word(""), "")
+test "fold_lower and fold_capitalise" {
+  assert_eq(fold_lower("HELLO", false), "hello")
+  assert_eq(fold_lower("iPhone", false), "iphone")
+  assert_eq(fold_lower("café", false), "café")
+  assert_eq(fold_capitalise("HELLO", false), "Hello")
+  assert_eq(fold_capitalise("iphone", false), "Iphone")
+  assert_eq(fold_capitalise("", false), "")
+  // A Turkish capital dotted `İ` is preserved as the first character.
+  assert_eq(fold_capitalise("İZMİR", false), "İzmir")
+  assert_eq(fold_lower("I", true), "ı")
+  assert_eq(fold_lower("İ", true), "i")
+  assert_eq(fold_capitalise("iç", true), "İç")
+  assert_eq(fold_capitalise("ışık", true), "Işık")
 }
 
 ///|

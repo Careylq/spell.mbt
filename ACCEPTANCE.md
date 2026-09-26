@@ -11,19 +11,22 @@
 | 4 | 提供 **README**：项目目标 / 安装方式 / 使用方法 / 示例 / **可复现** | ✅ | `README.mbt.md`（`README.md` 为其符号链接）；含 Quick start、CLI 用法、可复现步骤 |
 | 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | `.github/workflows/ci.yml` → `moon check` / `moon build` / `moon test` + 跨后端构建 |
 | 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ | `examples/basic`（`moon run examples/basic` 可直接运行，输出判定结果） |
-| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **118 个测试**，四个后端全部通过；另有符合率框架 `conformance/` |
+| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **154 个测试**（native 158 个），四个后端全部通过；另有符合率框架 `conformance/` |
 | 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.3.0`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
 | 9 | 采用 **OSI 认可的开源许可证** | ✅ | `LICENSE` = Apache-2.0 |
 | 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | `NOTICE`：参考 Hunspell（LGPL-2.1）的**格式规范与可观察行为**，未复制源码；测试语料不随仓库分发 |
 
 **已实测的符合率**（`bash conformance/run.sh`，154 个测试套件）：
-`.good` **730/848 = 86.1%** ｜ `.wrong` **579/613 = 94.5%** ｜ `.sug` **108/173 = 62.4%**
-未通过的 `.good` 集中在 README「Not implemented yet」中已明确列出的功能（`COMPOUNDMIDDLE`/`CHECKCOMPOUNDPATTERN`、德语复合词、`COMPLEXPREFIXES`、完整 Unicode 大小写折叠）。
+`.good` **825/848 = 97.3%** ｜ `.wrong` **611/613 = 99.7%** ｜ `.sug` **141/173 = 81.5%**
+未通过的 `.good` 里 16 个是 harness 把含空格的 `.good` 行错位的度量问题（`morph.good`），
+其余 7 个集中在 README「Not implemented yet」中已明确列出的功能（ALL-CAPS 输入匹配混合大小写词条、
+匈牙利 `LANG hu` 的 moving rule、`limit-multiple-compounding` 的三段复合词拼写检查）。
 
 **建议生成符合率**（`bash conformance/suggest.sh`，37 个 `.sug` 文件、173 行非空期望）：
-期望的最佳建议被产出 **108/173 = 62.4%**（按输入顺序做最大单调配对）；
-完全复现整个 `.sug` 文件（Hunspell 自己的判据）**5/37 套**。
-未通过的部分需要 `PHONE`/`ph:`、`MAP`、`OCONV`、`FORCEUCASE`、ngram 等本轮未实现的建议通道，
+期望的最佳建议被产出 **141/173 = 81.5%**（按输入顺序做最大单调配对）；
+期望最佳即我方第一条 **124/173 = 71.7%**；
+完全复现整个 `.sug` 文件（Hunspell 自己的判据）**7/37 套**。
+未通过的部分需要 ngram/`MAXNGRAMSUGS` 候选生成与 `FORCEUCASE` 驱动的建议通道，
 已在 README 的「Not implemented yet」中点名。
 
 ## 提交前的最后检查

@@ -361,6 +361,57 @@ printf 'hello\nzzzz\n' | moon run cmd/main -- check --aff a.aff --dic d.dic --wo
 
 ---
 
+## 36. `StringBuilder` 没有 `length()`（4015）
+
+- **症状**：`buffer.length() > 0` 报 `Type StringBuilder has no method length`。
+- **正确写法**：自己维护一个 `pending : Bool`，或 `buffer.to_string().is_empty()`。
+  本项目 `parse_compound_pattern` 用前者（避免每次 `to_string` 重新分配）。
+- **对照**：`String` 有 `length()`（UTF-16 code unit 数，见第 14 条），
+  `Array` 有 `length()`，所以很容易顺手写错。
+
+## 37. `priv enum` 上的 `derive(Eq)` 不需要 `extends.mbt`（第 35 条的反面）
+
+- **对比**：第 35 条说 **`pub(all)` 类型 + `derive`** 必须补显式 `pub extend` 块，
+  否则 `--deny-warn` 会把 warning 0079 当 error。
+- **实测**：本轮新增 `priv enum CpdRole { First; Middle; Last } derive(Eq)`，
+  `moon check --deny-warn --target all` **干净通过**，无需任何 `extend`。
+  同理，给已有的 `pub(all) struct AffFile` **加字段**也不需要新 extend
+  （只有**新增类型**才需要）。
+
+## 38. 🔴 `@unicode.to_lowercase('İ')` 原样返回 `İ`（U+0130 不在表里）
+
+- **症状**：`fold_lower("İZMİR")` 得到 `İzmİr`——里面的 `İ` 没被折叠成 `i`，
+  于是 `İZMİR` 找不到词典里的 `İzmir`。
+- **原因**：`moonbitlang/x/unicode` 的 `to_lowercase` 只覆盖一部分码点；
+  U+0130（LATIN CAPITAL LETTER I WITH DOT ABOVE）不在其中。
+- **正确写法**：显式处理。本项目：
+  1. `is_upper_char` 把 `'İ'` 直接当大写（`c == 'İ'`），
+  2. 大写化的“保留首字符、其余小写”路径里把 `'İ' → 'i'`，
+  3. `LANG tr/az/crh` 时再把 `'I' → 'ı'`、`'İ' → 'i'`、`'i' → 'İ'`、`'ı' → 'I'`。
+- **验证方式**：写一个临时 `_wbtest.mbt` 用 `println`/`debug_inspect` 打印折叠结果
+  （`is_upper_char('İ')` 也是 `false`），确认后删掉。**不要凭 Unicode 直觉假设它折叠对了。**
+
+## 39. `moon check --deny-warn` 不把 `_wbtest.mbt` 的使用算作“已使用”
+
+- **症状**：把一个只被 `_wbtest.mbt` 引用的私有函数留在包里，
+  `moon check --deny-warn` 报 `Error Warning (unused_value): Unused function 'x'`
+  （error id 0001，不是普通 warning）。
+- **正确写法**：要么让它被生产代码调用，要么连同测试一起改掉/删掉。
+  本轮 `lower_word` / `capitalise_word` 被 `fold_lower`/`fold_capitalise` 取代后
+  只剩测试在用，于是把测试改成调用新函数。
+- **延伸**：`moon test` 能过不代表 `moon check --deny-warn` 能过，
+  两者查的是不同的东西。
+
+## 40. 给带 `derive(Debug)` 的公开结构体加字段后，字符串字段的快照要带引号
+
+- **症状**：`@debug.debug_inspect(aff.lang, content="tr")` 失败，
+  diff 显示 `-tr` / `+"tr"`。
+- **原因**：第 1 条已经说过 `debug_inspect` 打印的是 `Debug` 表示，字符串带引号；
+  给 `AffFile` 加 `lang : String` 后写新快照很容易忘。
+- **正确写法**：`content="\"tr\""`，或照同文件里 `ignore_chars` 的写法用多行 `#|"tr"`。
+
+---
+
 ## 附二：实现过程中被测试抓出来的两个真 bug（值得记住）
 
 这两条是**语义性错误**，不是语法错误——编译器不会报，只有测试能抓：

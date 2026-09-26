@@ -45,6 +45,7 @@ pub fn parse_aff(text : String) -> AffFile raise AffParseError {
     index = index + 1
     match name {
       "SET" => builder.encoding = arg_at(line, 1, name)
+      "LANG" => builder.lang = arg_at(line, 1, name)
       "FLAG" => builder.flag_type = parse_flag_type(line, name)
       "AF" => {
         let count = parse_count(arg_at(line, 1, name), line.number, name)
@@ -118,7 +119,31 @@ pub fn parse_aff(text : String) -> AffFile raise AffParseError {
       "COMPOUNDFLAG" => builder.compound_flag = Some(arg_at(line, 1, name))
       "COMPOUNDBEGIN" => builder.compound_begin = Some(arg_at(line, 1, name))
       "COMPOUNDEND" => builder.compound_end = Some(arg_at(line, 1, name))
+      "COMPOUNDLAST" => builder.compound_end = Some(arg_at(line, 1, name))
       "COMPOUNDMIDDLE" => builder.compound_middle = Some(arg_at(line, 1, name))
+      "COMPOUNDPERMITFLAG" =>
+        builder.compound_permit = Some(arg_at(line, 1, name))
+      "COMPOUNDFORBIDFLAG" =>
+        builder.compound_forbid = Some(arg_at(line, 1, name))
+      "COMPOUNDWORDMAX" =>
+        builder.compound_word_max = parse_count(
+          arg_at(line, 1, name),
+          line.number,
+          name,
+        )
+      "COMPOUNDSYLLABLE" => {
+        builder.compound_syllable_max = parse_count(
+          arg_at(line, 1, name),
+          line.number,
+          name,
+        )
+        builder.compound_syllable_vowels = if line.tokens.length() > 2 {
+          arg_at(line, 2, name)
+        } else {
+          ""
+        }
+      }
+      "FORCEUCASE" => builder.forceucase = Some(arg_at(line, 1, name))
       "COMPOUNDRULE" => {
         let count = parse_count(arg_at(line, 1, name), line.number, name)
         let (body, next) = take_body(lines, index, name, count, line.number)
@@ -129,8 +154,10 @@ pub fn parse_aff(text : String) -> AffFile raise AffParseError {
       }
       "CHECKCOMPOUNDDUP" => builder.check_compound_dup = true
       "CHECKCOMPOUNDTRIPLE" => builder.check_compound_triple = true
-      "CHECKCOMPOUNDREPEAT" => builder.check_compound_repeat = true
-      "CHECKCOMPOUNDSIMPLIFIEDTRIPLE" =>
+      "CHECKCOMPOUNDREP" | "CHECKCOMPOUNDREPEAT" =>
+        builder.check_compound_repeat = true
+      "CHECKCOMPOUNDCASE" => builder.check_compound_case = true
+      "CHECKCOMPOUNDSIMPLIFIEDTRIPLE" | "SIMPLIFIEDTRIPLE" =>
         builder.check_compound_simplified_triple = true
       "CHECKCOMPOUNDPATTERN" => {
         let count = parse_count(arg_at(line, 1, name), line.number, name)
@@ -144,7 +171,8 @@ pub fn parse_aff(text : String) -> AffFile raise AffParseError {
       "KEEPCASE" => builder.special_keepcase = Some(arg_at(line, 1, name))
       "FORBIDDENWORD" =>
         builder.special_forbiddenword = Some(arg_at(line, 1, name))
-      "NEEDAFFIX" => builder.special_needaffix = Some(arg_at(line, 1, name))
+      "NEEDAFFIX" | "PSEUDOROOT" =>
+        builder.special_needaffix = Some(arg_at(line, 1, name))
       "CIRCUMFIX" => builder.special_circumfix = Some(arg_at(line, 1, name))
       "ONLYINCOMPOUND" =>
         builder.special_onlyincompound = Some(arg_at(line, 1, name))
@@ -163,6 +191,7 @@ pub fn parse_aff(text : String) -> AffFile raise AffParseError {
 /// Mutable accumulator used while parsing. Converted to `AffFile` by `finish`.
 priv struct AffBuilder {
   mut encoding : String
+  mut lang : String
   mut flag_type : FlagType
   affix_headers : Array[AffixHeader]
   affix_rules : Array[AffixRule]
@@ -187,10 +216,17 @@ priv struct AffBuilder {
   mut compound_end : String?
   mut compound_middle : String?
   compound_rules : Array[String]
+  mut compound_permit : String?
+  mut compound_forbid : String?
+  mut forceucase : String?
+  mut compound_word_max : Int
+  mut compound_syllable_max : Int
+  mut compound_syllable_vowels : String
   mut check_compound_dup : Bool
   mut check_compound_triple : Bool
   mut check_compound_repeat : Bool
   mut check_compound_simplified_triple : Bool
+  mut check_compound_case : Bool
   check_compound_pattern : Array[String]
   mut special_nosuggest : String?
   mut special_keepcase : String?
@@ -207,6 +243,7 @@ priv struct AffBuilder {
 fn new_builder() -> AffBuilder {
   {
     encoding: "",
+    lang: "",
     flag_type: SingleChar,
     affix_headers: [],
     affix_rules: [],
@@ -231,10 +268,17 @@ fn new_builder() -> AffBuilder {
     compound_end: None,
     compound_middle: None,
     compound_rules: [],
+    compound_permit: None,
+    compound_forbid: None,
+    forceucase: None,
+    compound_word_max: 0,
+    compound_syllable_max: 0,
+    compound_syllable_vowels: "",
     check_compound_dup: false,
     check_compound_triple: false,
     check_compound_repeat: false,
     check_compound_simplified_triple: false,
+    check_compound_case: false,
     check_compound_pattern: [],
     special_nosuggest: None,
     special_keepcase: None,
@@ -259,6 +303,7 @@ fn finish(builder : AffBuilder) -> AffFile {
   }
   {
     encoding: builder.encoding,
+    lang: builder.lang,
     flag_type: builder.flag_type,
     affix_headers: builder.affix_headers,
     affix_rules: builder.affix_rules,
@@ -283,10 +328,17 @@ fn finish(builder : AffBuilder) -> AffFile {
     compound_end: builder.compound_end,
     compound_middle: builder.compound_middle,
     compound_rules: builder.compound_rules,
+    compound_permit: builder.compound_permit,
+    compound_forbid: builder.compound_forbid,
+    forceucase: builder.forceucase,
+    compound_word_max: builder.compound_word_max,
+    compound_syllable_max: builder.compound_syllable_max,
+    compound_syllable_vowels: builder.compound_syllable_vowels,
     check_compound_dup: builder.check_compound_dup,
     check_compound_triple: builder.check_compound_triple,
     check_compound_repeat: builder.check_compound_repeat,
     check_compound_simplified_triple: builder.check_compound_simplified_triple,
+    check_compound_case: builder.check_compound_case,
     check_compound_pattern: builder.check_compound_pattern,
     special_flags,
     unrecognized: builder.unrecognized,
@@ -322,7 +374,13 @@ fn parse_affix_block(
     )
     let strip = arg_at(entry, 2, name)
     let add = arg_at(entry, 3, name)
-    let condition = arg_at(entry, 4, name)
+    // The condition is optional in the format; a rule without one matches every
+    // stem (`SFX A us órum` in `gh1002.aff`).
+    let condition = if entry.tokens.length() > 4 {
+      arg_at(entry, 4, name)
+    } else {
+      "."
+    }
     builder.affix_rules.push({
       kind,
       flag: rule_flag,

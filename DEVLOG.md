@@ -612,4 +612,142 @@ can't → 1     can’t → 1
 
 ---
 
+## 2026-09-27 · Day 8 — 收口 `.good`：复合词引擎 + `COMPLEXPREFIXES` + 德语
+
+**背景**：Day 7 结束时 `.good` **730/848 = 86.1%**，`.wrong` 579/613，
+`.sug` 133/173。README 的「Not implemented yet」几乎整段是复合词：`COMPOUNDMIDDLE`、
+`CHECKCOMPOUNDPATTERN`、复合词内部的词缀、德语 `germancompounding*`（26 词）、
+`COMPLEXPREFIXES`、匈牙利 `COMPOUNDSYLLABLE`。本轮逐个关掉。
+
+**逐项实测（`HUNSPELL_DIR=/tmp/hunspell_dl/hunspell-master`，每项后重跑三个数字）**
+
+| 步骤 | `.good` | `.wrong` | `.sug` best |
+|---|---|---|---|
+| 基线 | 730/848 = 86.1% | 579/613 = 94.5% | 133/173 = 76.9% |
+| ① `COMPLEXPREFIXES` | 734/848 | 579/613 | — |
+| ② 复合词引擎（n 段 + 词缀部件 + permit/forbid/forceucase） | 777/848 | **591/613** | 140/173 |
+| ③ `CHECKCOMPOUNDPATTERN` / dup / triple / case / rep / 词对 / FORBIDDENWORD 派生 | 778/848 | **600/613** | — |
+| ④ 德语 + `CIRCUMFIX` | **802/848** | 603/613 | 140/173 |
+| ⑤ 小项（前导 `/`、阿拉伯数字、混合大小写、`FORBIDDENWORD` 同形词） | 818/848 | 608/613 | 141/173 |
+| ⑥ `LANG tr` 土耳其大小写 + `base_utf` | **825/848 = 97.3%** | **611/613 = 99.7%** | **141/173 = 81.5%** |
+
+每一步都先跑 `.good` 和 `.wrong` 再进下一步；`.sug` 只会因为判定引擎变严而上升
+（`ph2` 从 12/14 升到 14/14），从未下降。
+
+**① `COMPLEXPREFIXES`（+4 词，零回归）**
+
+手册：「twofold prefix stripping (but single suffix stripping)」。实现成
+`derives_two_prefixes`：内层前缀的 continuation class 给外层前缀发 flag
+（`PFX B 0 met/A` → `metouro` 带 `A` → `PFX A 0 tek` → `tekmetouro`），
+同时**关掉双后缀路径**。`.aff` 里 `COMPLEXPREFIXES` 只出现在 `complexprefixes*` /
+`alias3` 四个套件，它们不需要双后缀，所以「关掉」没有代价。
+
+**② 复合词引擎：从「两段 + 纯词条」改成递归分割**
+
+旧实现只切一刀、只认纯词条。新实现把整词递归切成 n 段，每段按位置要 flag：
+
+- 首段要 `COMPOUNDFLAG` 或 `COMPOUNDBEGIN`，中间段要 `COMPOUNDMIDDLE`，末段要
+  `COMPOUNDEND`；`COMPOUNDMIN`（默认 3）限制每段长度。
+- **每段本身可以是词缀派生形**：compound flag 可以来自词干，也可以来自词缀的
+  continuation class；`COMPOUNDPERMITFLAG` 决定词缀能否出现在「词内部」
+  （前缀不在最前、后缀不在最后就需要它）；`COMPOUNDFORBIDFLAG` 让派生形完全退出复合；
+  suffix 的 continuation class 带 `ONLYINCOMPOUND` 时是 Fuge-element，后面必须还有一段。
+- 非末段的后缀、非首段的前缀属于「内部」，需要 permit；首段前缀、末段后缀不需要。
+  这三条是从语料 `compoundaffix{,2,3}` 的 good/wrong 差分出来的，又用本地
+  `hunspell 1.7.3` 写了 20 多个探针字典逐条确认（`h1`–`h6`、`d1`–`d7`、`w1`–`w6`）。
+
+**③ 禁止规则和允许规则一起加**：只加允许一定会掉 `.wrong`。本轮同时做：
+
+- `CHECKCOMPOUNDPATTERN endchars[/flag] beginchars[/flag] [replacement]`：边界文本 +
+  可选 flag（flag 可以来自词干、词缀规则自身或 continuation class——`checkcompoundpattern5/6/7`
+  专门考这三个来源）+ 手册的 `0`（只限未加词缀的词干）+ 可选 replacement（简化形，
+  如 `foo`+`bar` → `fozar`/`fur`）。
+- `CHECKCOMPOUNDDUP`：**最后两段不能相同**（探针证明 `foofoobar` 合法而 `foobarbar` 非法，
+  所以不是「任意相邻重复」）。
+- `CHECKCOMPOUNDTRIPLE` / `SIMPLIFIEDTRIPLE`（含 `gh151` 里 SIMPLIFIEDTRIPLE 单独使用、
+  借「补回一个字母」放宽 COMPOUNDMIN 的用法）。
+- `CHECKCOMPOUNDCASE`：边界两侧任一侧是大写就禁止。
+- `CHECKCOMPOUNDREP`：用 `REP`（含 `ph:` 派生规则）替换后得到词典词就禁止。
+- `.dic` 词对（`compound word`）禁掉无空格复合（`wordpair`、`ph2`）。
+- `FORBIDDENWORD`：词干的派生形同样被禁（`foowordbars`），且**同形词里只要有一个是正常词根
+  就仍然合法**（手册「excepts with root homonyms」，`foo/S` + `foo/YX` → `foo` 正确）。
+
+这一阶段 `.wrong` 从 579 涨到 600，`.good` 从 734 涨到 778。
+
+**④ 德语：手册里真的有规则，不是猜的（+26 词）**
+
+上一轮放弃德语的结论（「没有 `LANG de_DE`、没有 decapitalisation rule，无法从语料推导」）
+**是错的**。`hunspell(5)` 的 “Compounds” 一节直接给了德语方案：
+
+```
+LANG de_DE            # 只用于 sharp s
+COMPOUNDBEGIN U / COMPOUNDMIDDLE V / COMPOUNDEND W
+COMPOUNDPERMITFLAG P
+ONLYINCOMPOUND X
+CHECKCOMPOUNDCASE
+# decapitalizing prefix / circumfix for positioning in compounds
+PFX D Y 29
+PFX D A a/PX A
+...
+```
+
+`germancompounding.aff` 里逐字就是这些（没有 `LANG de_DE`，但 `LANG` 只影响 ß，
+而 `CHECKSHARPS` 已经实现）。规则本身是普通的词缀机器：`Arbeit/A-` 没有 `D`，
+但 `SFX A 0 0/WXD`（零后缀）把 `D` 放进 continuation class，于是
+`PFX D A a/PX` 能作用，得到小写 `arbeit`，并**继承内层后缀的 `W`（末段 flag）**。
+我们只需要两处修正：cross product 的 flag 可以来自对侧词缀的 continuation class
+（照 `derives_cross` 的 `suffix_first || prefix_first`），以及 Fuge 限制只看「最后应用的
+那个后缀」——有前缀时前缀可以是最外层，所以不再强制「后面必须还有一段」。
+
+`CIRCUMFIX` 也是这一步补的：德语旧正字法用 `CIRCUMFIX Y` 让
+`SFX A 0 s/VPXDY` 必须和 `PFX D .../PXY` 成对出现，于是
+`ComputerArbeitscomputer`（大写 `Arbeits` 单独派生）被拒，
+`Computerarbeitscomputer`（成对派生）通过。CIRCUMFIX 对**独立词**也生效：
+去掉 `SFX C 0 n .` 后 `Computern` 立刻变错（探针 `old3`）。
+
+`germancompounding` 20/20、`germancompoundingold` 14/14、两边 `.wrong` 各 50/50。
+
+**⑤ 小项（每项都先确认语料里真的值钱）**
+
+- `FULLSTRIP`：**不需要代码**——`apply_rule` 本来就允许 strip 整个词干；`fullstrip`
+  套件本来就 8/8。`PSEUDOROOT` 就是 `NEEDAFFIX` 的旧名（手册明说 deprecated），
+  直接做别名。
+- `.dic` 前导 `/`：`/AB` 是词、`/foo/AB` 是 `/foo` + flag `AB`、字节 `/` 是词 `/`。
+  改 `split_word_flags` 跳过首个字符位置的 `/`（`gh1122` +4、`slash` +1）。
+- 非 ASCII 数字：`gh353` 用 `WORDCHARS` 列了阿拉伯-印度数字，`is_digit_char` 补上
+  U+0660–U+0669 / U+06F0–U+06F9（+3）。
+- 混合大小写词首字母大写：`ULinda` 找 `uLinda`（`gh106` +2）。
+- `forbiddenword`：同形词语义修正（+1 good，+3 wrong）。
+- `LANG tr`：`İ`/`ı` 的土耳其大小写（`dotless_i` +5 good +2 wrong，`base_utf` +2 good +2 wrong）。
+  非土耳其语下 `İZMİR` → `İzmir`（保留首字符、其余走 Unicode 小写）；但
+  `İmply` 必须仍然错，所以非土耳其 `fold_lower` 不做 `İ→i` 映射。这个「保留首字符」
+  同时修好了 `base_utf` 的 `İZMİR`。
+
+**⑥ 顺带修的两个真 bug**
+
+1. **词缀 condition 可以省略**：`gh1002.aff` 的 `SFX A us órum` 只有 3 个字段，
+   旧解析器直接抛 `missing argument` 导致整个套件加载失败（harness 静默记 0）。
+   现在缺省为 `.`。
+2. **测试里两条旧断言是错的**：`spell_test.mbt` 断言「三段复合词必须 false」和
+   「`FORBIDDENWORD` 同形词禁掉整词」——两条都与语料矛盾，已改成正确语义并各加一个反例。
+
+**仍未做（诚实记录，README 已点名）**：ALL-CAPS 输入匹配混合大小写词条
+（`allcaps*` 7 词，手册没有文档化这个大小写算法，不猜）；匈牙利 `LANG hu` 的 moving rule
+（`hu` 1 词，手册只提名不定义）；`limit-multiple-compounding` 的三段复合词 typo 检查
+（1 词，无指令、手册未描述）。`morph` 的 16 词是 harness 对含空格 `.good` 行的度量错位，
+不是库的问题。
+
+**AI 使用方式（本日）**
+- 德语规则的证据链：先读 `man 5 hunspell` 的 “Compounds” 一节（文档）→ 发现
+  `germancompounding.aff` 就是手册示例 → 用本地 `hunspell 1.7.3` 复制语料字典到 `/tmp`
+  做**行为探针**（删掉 `SFX A 0 0/WXD`、删掉 `PFX D`、给 `Arbeit` 直接加 `D`、替换成
+  `SFX A 0 s/WXD`），逐条确认「零后缀发 `D` → 前缀作用 → 继承 `W`」这条链。
+  **没有读 Hunspell 源码**（LGPL），只看手册 + 可观察行为。
+- 所有新测试数据自己写；文档/语料只用于跑，不 vendor、不复制。
+- 本地 `hunspell 1.7.3` 与 master 语料并非处处一致（17 个套件有分歧，
+  `checkcompoundpattern5/6/7` 差分最明显），所以探针只用来确认**语义机制**，
+  最终判据始终是语料 `.good`/`.wrong`。
+
+---
+
 ## 待续

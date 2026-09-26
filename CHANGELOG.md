@@ -4,6 +4,54 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
+## [0.7.0] — 2026-09-27
+
+Conformance closeout. `.good` **730/848 → 825/848 (97.3%)**, `.wrong` **579/613 → 611/613 (99.7%)**,
+`.sug` **133/173 → 141/173 (81.5%)**. Tests 128 → 154 (wasm/wasm-gc/js) and 132 → 158 (native).
+
+### Added
+- **`COMPLEXPREFIXES`**: twofold prefix stripping with a single suffix level.
+- **Compound engines**: n-part recursion, `COMPOUNDMIDDLE`, affixed parts inside compounds,
+  `COMPOUNDPERMITFLAG` / `COMPOUNDFORBIDFLAG`, the `ONLYINCOMPOUND` Fuge rule, `FORCEUCASE`,
+  `CHECKCOMPOUNDPATTERN` (including flags, `0` and replacement forms), `CHECKCOMPOUNDDUP`,
+  `CHECKCOMPOUNDTRIPLE` / `SIMPLIFIEDTRIPLE`, `CHECKCOMPOUNDCASE`, `CHECKCOMPOUNDREP`,
+  `.dic` word-pair blocking, and `CIRCUMFIX`.
+- **German compounding**, implemented from the "German compounding" section of the `hunspell(5)`
+  manual (the decapitalising `PFX D A a/PX A …` construction, `LANG de_DE` only affects `ß`).
+  `germancompounding` 20/20, `germancompoundingold` 14/14, both `.wrong` 50/50. An earlier pass had
+  concluded the rule was not derivable from the corpus — that conclusion was wrong.
+- `PSEUDOROOT`, `COMPOUNDWORDMAX` / `COMPOUNDSYLLABLE` (Hungarian), `LANG tr` Turkic casing
+  (`İ`/`ı`), leading `/` in `.dic` words, and Arabic-Indic digits.
+
+### Fixed
+- An affix line with the condition omitted (e.g. `SFX A us orum`) made the whole `.aff` fail to
+  load, so that suite silently scored 0. The parser now defaults the condition to `.`.
+- Two existing tests asserted behaviour contradicted by the reference: a three-part compound was
+  expected to be rejected (`CHECKCOMPOUNDDUP` only forbids when the *last two* parts are identical),
+  and a `FORBIDDENWORD` homonym was expected to forbid the root spelling (the manual's "excepts with
+  root homonyms" says it stays correct through the root). Both were corrected against the manual and
+  the corpus, not deleted.
+
+### Not implemented
+`ALL-CAPS` input against a mixed-case dictionary form (`allcaps*`, 6 words — the manual documents the
+flags but not the casing algorithm), the Hungarian `LANG hu` "moving rule" for the
+`COMPOUNDFORBIDSPECIAL` stem (1 word), and `limit-multiple-compounding`'s three-part typo check
+(1 word). None were guessed at.
+
+## [0.6.0] — 2026-09-27
+
+### Added
+- **`MAP`** character-group substitution (recursive, so `Fruhstuck` reaches `Frühstück`) and the
+  **`PHONE`** phonetic pass (classes, `-` retention and rescan, `<` rescan, digit priorities,
+  `^`/`$`, `_` = empty, unmatched characters dropped) with a load-time phonetic index, plus the
+  `ph:` inner REP table in its plain, trailing-`*` and `->` forms and `.dic` `ph:` keys.
+
+  `.sug`: 108/173 (62.4%) → **133/173 (76.9%)**; as-first 93/173 → 118/173; exact suites 5/37 → 7/37.
+  The real `en_US` dictionary ships no `PHONE` or `MAP`, so the shipped cost is zero; a synthetic
+  105-rule `PHONE` table raises load from 61 ms to 127 ms over 49,568 entries and per-suggestion cost
+  by about 1%. `PHONE`'s own contribution to the corpus score is zero — the `phone` suite already
+  passed — and is documented as such.
+
 ## [0.5.0] — 2026-09-27
 
 ### Added

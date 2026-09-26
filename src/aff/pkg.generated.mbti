@@ -20,6 +20,7 @@ pub impl Show for AffParseError
 pub(all) struct AffFile {
   encoding : String
   flag_type : FlagType
+  lang : String
   affix_headers : Array[AffixHeader]
   affix_rules : Array[AffixRule]
   flag_aliases : Array[String]
@@ -43,10 +44,17 @@ pub(all) struct AffFile {
   compound_end : String?
   compound_middle : String?
   compound_rules : Array[String]
+  compound_permit : String?
+  compound_forbid : String?
+  forceucase : String?
+  compound_word_max : Int
+  compound_syllable_max : Int
+  compound_syllable_vowels : String
   check_compound_dup : Bool
   check_compound_triple : Bool
   check_compound_repeat : Bool
   check_compound_simplified_triple : Bool
+  check_compound_case : Bool
   check_compound_pattern : Array[String]
   special_flags : SpecialFlags
   unrecognized : Array[UnknownDirective]

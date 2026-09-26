@@ -11,7 +11,7 @@ for the words it rejects.
 > code block below is verified by `moon check`. `README.md` is a symlink to this file
 > so that GitHub renders it.
 
-> **Status: 0.6.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
+> **Status: 0.7.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
 > judgement engine, the suggestion engine, the public API and the `check` /
 > `suggest` CLI subcommands are implemented and tested on all four backends. See
 > [Not implemented yet](#not-implemented-yet) for what suggestion generation
@@ -27,9 +27,9 @@ actual run of the harness, not an estimate.
 
 | Metric | Passing | Total | Pass rate |
 |---|---|---|---|
-| `.good` (must be accepted) | 730 | 848 | 86.1% |
-| `.wrong` (must be rejected) | 579 | 613 | 94.5% |
-| `.sug` (expected best suggestion produced) | 133 | 173 | 76.9% |
+| `.good` (must be accepted) | 825 | 848 | 97.3% |
+| `.wrong` (must be rejected) | 611 | 613 | 99.7% |
+| `.sug` (expected best suggestion produced) | 141 | 173 | 81.5% |
 
 The `.sug` row is measured by `bash conformance/suggest.sh`, which is **additive** and
 never touches the `.good`/`.wrong` computation. A `.sug` line holds the suggestions
@@ -42,30 +42,28 @@ line-by-line positional pairing is impossible. Exactly what was counted:
   suggestion list this library returned for some wrong word, matched to a **distinct**
   wrong word in input order (a maximum monotone matching, so each expected line is used
   at most once and ordering is respected). Ranking within our list is therefore not
-  required to pass this row. 133/173 = 76.9%.
+  required to pass this row. 141/173 = 81.5%.
 * For reference, the stricter "our first suggestion equals the expected best
-  suggestion" is 118/173 = 68.2%, and reproducing a whole `.sug` file exactly —
+  suggestion" is 124/173 = 71.7%, and reproducing a whole `.sug` file exactly —
   Hunspell's own test criterion, in order and with no extra suggestion — holds for
   **7/37 suites** (18.9%).
 
-The `MAP` related-character groups and the `ph:`/`PHONE` phonetic passes are now
-implemented, which is where most of the improvement came from: `map` and `maputf` went
-from 0/3 to 3/3 each, `ph` from 3/11 to 11/11 and `ph2` from 1/14 to 12/14. The
-remaining `.sug` gap is dominated by the passes that are still out of scope: the
-ngram/`MAXNGRAMSUGS` candidate generator, `FORCEUCASE`-driven suggestions, and the
-places where the judgement engine is more permissive than Hunspell: one `ph2` line
-(`forbiddenroot`) is *accepted* by `check`, so no suggestion is produced at all, and
-another (`stembazstem`) needs a three-part compound that `check` still rejects. Where
-the corpus needs those, the library returns fewer (or no) suggestions; it never
-invents one `check` rejects.
+The `MAP` related-character groups and the `ph:`/`PHONE` phonetic passes are
+implemented, which is where most of the suggestion improvement came from: `map` and
+`maputf` went from 0/3 to 3/3 each, `ph` from 3/11 to 11/11 and `ph2` from 1/14 to
+14/14. The remaining `.sug` gap is dominated by the passes that are still out of
+scope: the ngram/`MAXNGRAMSUGS` candidate generator and `FORCEUCASE`-driven
+suggestions. Where the corpus needs those, the library returns fewer (or no)
+suggestions; it never invents one `check` rejects.
 
-The remaining `.good` gap is dominated by the compound engines this release still
-leaves partial: `COMPOUNDMIDDLE`, `CHECKCOMPOUNDPATTERN`, affixed parts inside
-compounds and the German `COMPOUNDBEGIN`/`COMPOUNDMIDDLE`/`COMPOUNDEND` suites
-(`germancompounding` and `germancompoundingold` alone account for 26 of the 118
-missing words). After that come `COMPLEXPREFIXES` (twofold prefix stripping) and
-the Hungarian `COMPOUNDSYLLABLE`/`COMPOUNDFORBIDFLAG` rules. The `.wrong` column is
-the stronger result: only 34 of 613 words that must be rejected are wrongly
+The remaining `.good` gap is now 23 words, and 16 of those are the harness
+measurement artifact described below (`morph.good`). The genuinely missing seven come
+from casing idioms the manual does not spell out: matching an ALL-CAPS input against a
+mixed-case dictionary form such as `OpenOffice.org` or `iPod` (`allcaps`, `allcaps_utf`,
+`allcaps2`, 6 words), the Hungarian "moving rule" for a `COMPOUNDFORBIDFLAG` stem
+(`hu`, 1 word), and the word-count typo check the `limit-multiple-compounding` corpus
+expects for three-part compounds (1 word). The `.wrong` column is now 611/613 = 99.7%:
+only `limit-multiple-compounding`'s `foobarbaz` and one `allcaps2` word are wrongly
 accepted. Run `bash conformance/run.sh` locally to reproduce.
 
 > Measurement caveat: the harness pairs each `.good` line with the verdict of the
@@ -288,14 +286,17 @@ list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`
 
 ### Implemented
 
-- **`.aff` parser** — `SET`, `FLAG`, `AF`, `AM`, `PFX`, `SFX`, `REP`, `TRY`, `KEY`,
-  `IGNORE`, `WORDCHARS`, `CHECKSHARPS`, `BREAK`, `ICONV`/`OCONV`, `COMPOUND*`, and the
+- **`.aff` parser** — `SET`, `LANG`, `FLAG`, `AF`, `AM`, `PFX`, `SFX`, `REP`, `TRY`,
+  `KEY`, `IGNORE`, `WORDCHARS`, `CHECKSHARPS`, `COMPLEXPREFIXES`, `BREAK`,
+  `ICONV`/`OCONV`, every `COMPOUND*` and `CHECKCOMPOUND*` directive, and the
   special-flag directives (`NOSUGGEST`, `KEEPCASE`, `FORBIDDENWORD`, `NEEDAFFIX`,
-  `CIRCUMFIX`, `ONLYINCOMPOUND`).
+  `PSEUDOROOT`, `CIRCUMFIX`, `ONLYINCOMPOUND`). An affix rule's condition may be
+  omitted (it then matches every stem).
   Unmodelled directives are collected in an `unrecognized` list rather than dropped.
   Errors carry 1-based line numbers.
 - **`.dic` parser** — entry count (text after the count on the same line is ignored, as
-  Hunspell does), `word/FLAGS`, optional morphological fields, `\/` escaping, and flag
+  Hunspell does), `word/FLAGS`, optional morphological fields, `\/` escaping (a leading
+  `/`, as in `/usr/share/myspell/`, belongs to the word), and flag
   decoding for all four `FLAG` modes (single-char, `long`, `num`, `UTF-8`).
 - **Affix rule engine** — `matches_condition` (Hunspell's simplified pattern language:
   `.`, `[abc]`, `[^abc]`, literals; anchored to the start for prefixes and the end for
@@ -319,24 +320,44 @@ list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`
     continuation classes alike (`foos` is not a word when `SFX A 0 s/XB .` gives it
     `NEEDAFFIX`; `foosbar` is);
   * capitalisation rules: all-lowercase, `Capitalised`, `ALL CAPS` and mixed case (mixed
-    case must match exactly);
+    case must match exactly), plus the upper-cased first letter of a mixed-case word
+    (`ULinda` finds `uLinda`) and the `LANG tr`/`az`/`crh` dotted/dotless `I` casing
+    (`İZMİR` finds `İzmir`, `Işık` finds `ışık`);
   * `CHECKSHARPS`: an uppercased word may spell a dictionary `ß` as `SS`
     (`PROZESSIONSSTRASSE` finds `Prozessionsstraße`), a capital sharp s (`ẞ`, U+1E9E)
     folds to `ß`, and a `KEEPCASE` word containing `ß` may be capitalised or uppercased
     with `SS` but not with a sharp s (`MÜßIG` stays wrong);
-  * special flags `FORBIDDENWORD`, `KEEPCASE` (including on compound parts),
-    `NEEDAFFIX`, `ONLYINCOMPOUND`;
+  * special flags `FORBIDDENWORD` (a root homonym survives a forbidden one),
+    `KEEPCASE` (including on compound parts), `NEEDAFFIX` (with `PSEUDOROOT` as its
+    deprecated spelling), `ONLYINCOMPOUND` and `CIRCUMFIX` (an affix with the flag
+    needs an affix of the opposite kind with it);
   * `IGNORE` characters are dropped from dictionary entries, from affix `strip`/`add`
     text and from the checked word before any comparison (Arabic harakat, right-to-left
     marks);
   * a trailing `.` is accepted for abbreviations when `WORDCHARS` declares `.`, and a
-    number with one separator (`.`, `,`, `-`) between digits is accepted when
-    `WORDCHARS` declares that separator (`1.12345`, `4,2`, `42-42`);
+    number (ASCII or Arabic-Indic digits) with one separator (`.`, `,`, `-`) between
+    digits is accepted when `WORDCHARS` declares that separator (`1.12345`, `4,2`,
+    `42-42`);
   * `BREAK` splitting, recursively: the declared break points, or Hunspell's defaults
     `-`, `^-` and `-$` (`foo-bar-foo-bar`), with `BREAK 0` switching breaking off;
-  * a line of whitespace-separated words is correct when every word on it is correct;
-  * two-part compounds whose parts carry `COMPOUNDFLAG`, `COMPOUNDBEGIN` or
-    `COMPOUNDEND` (`COMPOUNDMIN`, default `3`);
+  * a line of whitespace-separated words is correct when every word on it is correct,
+    and a `.dic` word pair (`compound word`) blocks the space-free compound;
+  * compounds of two or more parts, recursive over the whole word:
+    `COMPOUNDFLAG`/`COMPOUNDBEGIN`/`COMPOUNDMIDDLE`/`COMPOUNDEND`/`COMPOUNDLAST` choose
+    the flag each position needs, `COMPOUNDMIN` (default `3`) the minimum part length,
+    and a part may itself be affixed — its compound flag comes from the stem or from the
+    affix's continuation class, an affix "inside" the word needs `COMPOUNDPERMITFLAG`,
+    `COMPOUNDFORBIDFLAG` removes the derived form (or the plain first/middle word) from
+    compounding, and a suffix whose continuation class carries `ONLYINCOMPOUND` is a
+    Fuge-element that must be followed by another part;
+  * `COMPLEXPREFIXES` trades the second suffix level for a second *prefix* level, so
+    `tekmetouro` is reachable when the inner prefix hands the outer one its flag;
+  * `CHECKCOMPOUNDPATTERN` boundaries (`endchars[/flag] beginchars[/flag]`, the special
+    `0` unmodified-stem pattern, and the optional replacement that allows the simplified
+    form), `CHECKCOMPOUNDDUP`, `CHECKCOMPOUNDTRIPLE` with `SIMPLIFIEDTRIPLE`,
+    `CHECKCOMPOUNDCASE`, `CHECKCOMPOUNDREP`, `COMPOUNDWORDMAX` and `COMPOUNDSYLLABLE`
+    (the Hungarian "more words when few syllables" exception), and `FORCEUCASE` (a
+    compound whose last part carries it must be capitalised);
   * `COMPOUNDRULE` patterns over the parts' compound flags, with `*` (zero or more),
     `?` (zero or one) and parenthesized multi-character flags, matched by recursive
     decomposition of the word (so `1*`-style rules such as `n*mp` accept `100th`).
@@ -392,29 +413,38 @@ each of wasm, wasm-gc, js and native.
 
 ### Not implemented yet
 
-- **Compounds of three or more parts, and affixed parts inside a compound** — the
-  two-part case is handled, and `COMPOUNDRULE` decomposition is recursive, but a compound
-  part must be a plain dictionary entry. `COMPOUNDMIDDLE`, `COMPOUNDPERMITFLAG`/
-  `COMPOUNDFORBIDFLAG`, `CHECKCOMPOUNDPATTERN`, `CHECKCOMPOUNDDUP`/`TRIPLE`,
-  `COMPOUNDWORDMAX`/`COMPOUNDSYLLABLE` and `CHECKCOMPOUNDREP` are parsed but not applied,
-  which is why the German `germancompounding*` suites and `limit-multiple-compounding`
-  still lose words.
-- **`COMPLEXPREFIXES`** (twofold prefix stripping, needed by `alias3` and
-  `complexprefixes*`).
-- **`FORCEUCASE`** and `NOSUGGEST` semantics at lookup time (both are parsed; `NOSUGGEST`
-  is honoured when filtering suggestion candidates).
-- **`FULLSTRIP`, `PSEUDOROOT` and `COMPOUNDROOT`** handling.
-- **Unicode upper-casing** — lowercasing uses `moonbitlang/x/unicode`, but upper-casing
-  is ASCII-only, so a non-ASCII first letter is not capitalised (`dotless_i` and the
-  Turkish/Azeri casing rules). `CHECKSHARPS` covers German `ß` explicitly.
+- **ALL-CAPS input against a mixed-case dictionary form** — Hunspell matches
+  `OPENOFFICE.ORG` to `OpenOffice.org`, `UNICEF'S` to `UNICEF's` and `IPOD` to `iPod`.
+  The library only folds an ALL-CAPS word to its lowercase and capitalised spellings, so
+  those three (`allcaps`, `allcaps_utf`, `allcaps2`, 7 words) are still lost, and one
+  `allcaps2` forbidden word (`iPodos`) is consequently accepted. The `hunspell(5)` manual
+  documents the *flags* (`KEEPCASE`, `CHECKSHARPS`) but not the casing algorithm itself.
+- **The Hungarian "moving rule"** — `LANG hu` activates a hard-wired rule that lets a
+  `COMPOUNDFORBIDFLAG` stem rebuild itself inside a hyphenated compound
+  (`forróvíz-tartály`). `COMPOUNDWORDMAX`/`COMPOUNDSYLLABLE` are implemented, so this one
+  word is all that `hu` still misses; the manual only names the rule, it does not define
+  the rebuild.
+- **`limit-multiple-compounding`'s three-part typo check** — that corpus expects a
+  three-or-more-part compound to be rejected when it is one edit away from a dictionary
+  word (`foobarbaz` vs `goobarbaz`). No directive requests it and the manual does not
+  describe it, so it is not guessed at.
+- **`COMPOUNDROOT` / `SYLLABLENUM`** — parsed into the AST but not applied; no corpus
+  suite exercises them.
 - **Suggestion quality beyond the implemented passes** — there is no
   ngram/`MAXNGRAMSUGS` candidate generator (`MAXNGRAMSUGS` is still only an unknown
   directive, which is harmless while the generator itself is absent), and `FORCEUCASE`
   does not drive a suggestion. Edit distance 2 is only the bounded O(n²) subset listed
   above (no two arbitrary replacements, no replacement-plus-insertion). The `PHONE` pass
   treats a `^^` pattern as a plain start anchor followed by re-scanning from the end of
-  the match instead of a fully separate sub-word (no corpus table uses `^^`). This is why
-  `.sug` is at 76.9% rather than higher.
+  the match instead of a fully separate sub-word (no corpus table uses `^^`). One
+  `COMPOUNDRULE`-style case also remains: a `CHECKCOMPOUNDPATTERN` replacement is not
+  tried when the *endchars* leave a doubled letter across the join (a contrived
+  `kroom`+`om b` case), matching Hunspell only for the corpus shapes. This is why `.sug`
+  is at 81.5% rather than higher.
+- **Unicode upper-casing beyond the special cases** — upper-casing is ASCII-only plus the
+  explicit `İ`/`ı` and `ß` rules; a fully general Unicode case table is not shipped.
+  `FULLSTRIP` needs no special code (a rule may already strip the whole stem) and
+  `PSEUDOROOT` is accepted as the deprecated spelling of `NEEDAFFIX`.
 - FFI bindings to the Hunspell C++ library. The parsing, affix, judgement and suggestion
   logic is written from scratch in MoonBit and links against no speller — see
   [Native code](#native-code) for the one exception, a small stdin shim in the CLI.

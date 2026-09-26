@@ -185,8 +185,11 @@ fn full_word_of(tokens : Array[String], count : Int) -> String {
 ///|
 /// Split the first field of an entry into its word and its raw flag text.
 ///
-/// The word ends at the first unescaped `/`; `\/` is emitted as a literal `/`.
-/// Returns `None` for the flag text when the field has no unescaped `/`.
+/// The word ends at the first unescaped `/` that is not the very first
+/// character; `\/` is emitted as a literal `/`. A leading `/` belongs to the
+/// word (`/foo/AB` is the word `/foo` with the flags `AB`, and `/AB` is just the
+/// word `/AB`). Returns `None` for the flag text when the field has no
+/// separator.
 fn split_word_flags(field : String) -> (String, String?) {
   let chars = field.to_array()
   let word = StringBuilder()
@@ -197,7 +200,7 @@ fn split_word_flags(field : String) -> (String, String?) {
     if c == '\\' && index + 1 < chars.length() && chars[index + 1] == '/' {
       word.write_char('/')
       index = index + 2
-    } else if c == '/' {
+    } else if c == '/' && index > 0 {
       let flags = StringBuilder()
       let mut rest = index + 1
       while rest < chars.length() {

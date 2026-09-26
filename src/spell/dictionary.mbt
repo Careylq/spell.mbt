@@ -42,6 +42,9 @@ pub struct Dictionary {
   keepcase : String?
   needaffix : String?
   onlyincompound : String?
+  /// `CIRCUMFIX`: an affix carrying this flag may only be applied together with
+  /// an affix of the opposite kind that carries it too.
+  circumfix : String?
   compound_flag : String?
   /// `COMPOUNDBEGIN` / `COMPOUNDEND`: the flags that licence a word as the
   /// first or the last part of a compound (`check_compound`). `COMPOUNDMIDDLE`
@@ -49,9 +52,33 @@ pub struct Dictionary {
   compound_begin : String?
   compound_end : String?
   compound_middle : String?
+  /// `COMPOUNDPERMITFLAG` / `COMPOUNDFORBIDFLAG`: the flags that let an affix sit
+  /// inside a compound / forbid an affixed word from being a compound part.
+  compound_permit : String?
+  compound_forbid : String?
+  /// `FORCEUCASE`: a compound whose last part carries this flag is only correct
+  /// when the whole word is capitalised.
+  forceucase : String?
   /// The `COMPOUNDRULE` patterns, verbatim. A compound is correct when its
   /// parts' flags match one of them (`check_compound_rule` parses them).
   compound_rules : Array[String]
+  /// The `CHECKCOMPOUNDPATTERN` lines, verbatim; parsed at match time.
+  check_compound_pattern : Array[String]
+  check_compound_dup : Bool
+  check_compound_triple : Bool
+  check_compound_simplified_triple : Bool
+  check_compound_case : Bool
+  /// `0` means unlimited.
+  compound_word_max : Int
+  /// `COMPOUNDSYLLABLE max vowels`; `0` means the directive was absent.
+  compound_syllable_max : Int
+  compound_syllable_vowels : String
+  /// `REP`-driven `CHECKCOMPOUNDREP`.
+  check_compound_rep : Bool
+  /// The space-free spellings of `.dic` word pairs (`compound word`). A
+  /// compound must not be recognised for one of these: the word pair is the
+  /// only correct spelling (`wordpair`, `ph2`).
+  blocked_compounds : Map[String, Bool]
   /// `0` means the `.aff` had no `COMPOUNDMIN`; Hunspell's default of `3` is
   /// applied at match time.
   compound_min : Int
@@ -109,6 +136,8 @@ pub struct Dictionary {
   break_patterns : Array[String]
   encoding : String
   flag_type : @aff.FlagType
+  /// `LANG tr` / `az` / `crh`: use the Turkic dotted/dotless `I` casing rules.
+  turkic : Bool
   rule_count : Int
 }
 
@@ -141,6 +170,7 @@ pub fn Dictionary::from_text(
     error => raise DicParse(error)
   }
   let entries : Map[String, Array[Array[String]]] = Map([])
+  let blocked_compounds : Map[String, Bool] = Map([])
   let ignore_chars = aff.ignore_chars.to_array()
   for entry in dic.entries {
     let flags : Array[String] = []
@@ -181,6 +211,12 @@ pub fn Dictionary::from_text(
           entries[full] = homonyms
         }
       }
+      // The same word without its space must never be recognised as a compound:
+      // the word pair is the only accepted spelling.
+      let joined = remove_whitespace(full)
+      if !joined.is_empty() {
+        blocked_compounds[joined] = true
+      }
     }
   }
   let prefix_rules : Array[SpellRule] = []
@@ -215,11 +251,25 @@ pub fn Dictionary::from_text(
     keepcase: special.keepcase,
     needaffix: special.needaffix,
     onlyincompound: special.onlyincompound,
+    circumfix: special.circumfix,
     compound_flag: aff.compound_flag,
     compound_begin: aff.compound_begin,
     compound_end: aff.compound_end,
     compound_middle: aff.compound_middle,
+    compound_permit: aff.compound_permit,
+    compound_forbid: aff.compound_forbid,
+    forceucase: aff.forceucase,
     compound_rules: aff.compound_rules,
+    check_compound_pattern: aff.check_compound_pattern,
+    check_compound_dup: aff.check_compound_dup,
+    check_compound_triple: aff.check_compound_triple,
+    check_compound_simplified_triple: aff.check_compound_simplified_triple,
+    check_compound_case: aff.check_compound_case,
+    compound_word_max: aff.compound_word_max,
+    compound_syllable_max: aff.compound_syllable_max,
+    compound_syllable_vowels: aff.compound_syllable_vowels,
+    check_compound_rep: aff.check_compound_repeat,
+    blocked_compounds,
     compound_min: aff.compound_min,
     word_chars: aff.word_chars,
     try_chars: aff.try_chars,
@@ -246,6 +296,7 @@ pub fn Dictionary::from_text(
     },
     encoding: aff.encoding,
     flag_type: aff.flag_type,
+    turkic: aff.lang == "tr" || aff.lang == "az" || aff.lang == "crh",
     rule_count: aff.affix_rules.length(),
   }
 }
@@ -264,6 +315,18 @@ fn remove_ignored(text : String, ignored : Array[Char]) -> String {
   let buffer = StringBuilder()
   for c in text {
     if !ignored.contains(c) {
+      buffer.write_char(c)
+    }
+  }
+  buffer.to_string()
+}
+
+///|
+/// Remove every whitespace character from `text` (`"a lot"` -> `"alot"`).
+fn remove_whitespace(text : String) -> String {
+  let buffer = StringBuilder()
+  for c in text {
+    if !c.is_whitespace() {
       buffer.write_char(c)
     }
   }

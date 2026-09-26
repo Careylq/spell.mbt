@@ -509,3 +509,47 @@ test "PHONE is parsed into pattern/replacement rules" {
     assert_false(directive.name == "MAP" || directive.name == "PHONE")
   }
 }
+
+///|
+test "permit/forbid flags, word max, syllable and the small directives" {
+  let text =
+    #|SET UTF-8
+    #|LANG tr
+    #|COMPOUNDPERMITFLAG P
+    #|COMPOUNDFORBIDFLAG Z
+    #|COMPOUNDWORDMAX 2
+    #|COMPOUNDSYLLABLE 6 aeiou
+    #|FORCEUCASE F
+    #|CHECKCOMPOUNDCASE
+    #|CHECKCOMPOUNDREP
+    #|SIMPLIFIEDTRIPLE
+    #|COMPOUNDLAST L
+    #|PSEUDOROOT X
+  let aff = @aff.parse_aff(text)
+  @debug.debug_inspect(aff.lang, content="\"tr\"")
+  @debug.debug_inspect(aff.compound_permit, content="Some(\"P\")")
+  @debug.debug_inspect(aff.compound_forbid, content="Some(\"Z\")")
+  @debug.debug_inspect(aff.compound_word_max, content="2")
+  @debug.debug_inspect(aff.compound_syllable_max, content="6")
+  @debug.debug_inspect(aff.compound_syllable_vowels, content="\"aeiou\"")
+  @debug.debug_inspect(aff.forceucase, content="Some(\"F\")")
+  @debug.debug_inspect(aff.check_compound_case, content="true")
+  @debug.debug_inspect(aff.check_compound_repeat, content="true")
+  @debug.debug_inspect(aff.check_compound_simplified_triple, content="true")
+  @debug.debug_inspect(aff.compound_end, content="Some(\"L\")")
+  @debug.debug_inspect(aff.special_flags.needaffix, content="Some(\"X\")")
+  @debug.debug_inspect(aff.unrecognized.length(), content="0")
+}
+
+///|
+test "an affix rule condition may be omitted" {
+  let text =
+    #|SFX A N 1
+    #|SFX A us orum
+  let aff = @aff.parse_aff(text)
+  @debug.debug_inspect(aff.affix_rules.length(), content="1")
+  @debug.debug_inspect(aff.affix_rules[0].strip, content="\"us\"")
+  @debug.debug_inspect(aff.affix_rules[0].add, content="\"orum\"")
+  // the omitted condition defaults to `.`
+  @debug.debug_inspect(aff.affix_rules[0].condition, content="\".\"")
+}

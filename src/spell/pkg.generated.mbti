@@ -26,11 +26,25 @@ pub struct Dictionary {
   keepcase : String?
   needaffix : String?
   onlyincompound : String?
+  circumfix : String?
   compound_flag : String?
   compound_begin : String?
   compound_end : String?
   compound_middle : String?
+  compound_permit : String?
+  compound_forbid : String?
+  forceucase : String?
   compound_rules : Array[String]
+  check_compound_pattern : Array[String]
+  check_compound_dup : Bool
+  check_compound_triple : Bool
+  check_compound_simplified_triple : Bool
+  check_compound_case : Bool
+  compound_word_max : Int
+  compound_syllable_max : Int
+  compound_syllable_vowels : String
+  check_compound_rep : Bool
+  blocked_compounds : Map[String, Bool]
   compound_min : Int
   word_chars : String
   try_chars : String
@@ -49,6 +63,7 @@ pub struct Dictionary {
   break_patterns : Array[String]
   encoding : String
   flag_type : @aff.FlagType
+  turkic : Bool
   rule_count : Int
 }
 pub fn Dictionary::apply_oconv(Self, String) -> String

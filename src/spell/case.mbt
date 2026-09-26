@@ -32,7 +32,7 @@ priv enum CaseKind {
 /// count as upper-case. This is a deliberately cheap test: it never has to know
 /// the full Unicode case table (see the README limitations).
 fn is_upper_char(c : Char) -> Bool {
-  c.is_ascii_uppercase() || @unicode.to_lowercase(c) != c
+  c.is_ascii_uppercase() || c == 'İ' || @unicode.to_lowercase(c) != c
 }
 
 ///|
@@ -46,7 +46,7 @@ fn is_upper_char(c : Char) -> Bool {
 /// must be treated as mixed case (so it only matches exactly), because an
 /// uppercased form of a word with `ß` may only spell it `SS`.
 fn is_lower_char(c : Char, sharps : Bool) -> Bool {
-  c.is_ascii_lowercase() || (sharps && c == 'ß')
+  c.is_ascii_lowercase() || c == 'ı' || (sharps && c == 'ß')
 }
 
 ///|
@@ -76,30 +76,87 @@ fn classify_case(word : String, sharps : Bool) -> CaseKind {
 }
 
 ///|
-/// Lower-case every character of `word`.
-fn lower_word(word : String) -> String {
+/// Lower-case every character of `word`, using the Turkic `I`/`İ` mapping when
+/// the `.aff` declares `LANG tr` (or `az` / `crh`).
+fn fold_lower(word : String, turkic : Bool) -> String {
   let buffer = StringBuilder()
   for c in word {
-    buffer.write_char(@unicode.to_lowercase(c))
+    if turkic && c == 'I' {
+      buffer.write_char('ı')
+    } else if turkic && c == 'İ' {
+      buffer.write_char('i')
+    } else {
+      buffer.write_char(@unicode.to_lowercase(c))
+    }
   }
   buffer.to_string()
 }
 
 ///|
-/// The `Capitalised` form of `word`: lower-case it, then upper-case the first
-/// character (ASCII only, see the module comment).
-fn capitalise_word(word : String) -> String {
-  let lowered = lower_word(word)
-  let chars = lowered.to_array()
+/// `word` with its first character lower-cased (`ULinda` -> `uLinda`). Hunspell
+/// accepts the upper-cased first letter of a mixed-case word (`gh106`).
+fn lower_first_word(word : String) -> String {
+  let chars = word.to_array()
   if chars.length() == 0 {
-    return lowered
+    return word
   }
   let buffer = StringBuilder()
-  buffer.write_char(chars[0].to_ascii_uppercase())
+  buffer.write_char(chars[0].to_ascii_lowercase())
   let mut index = 1
   while index < chars.length() {
     buffer.write_char(chars[index])
     index = index + 1
   }
   buffer.to_string()
+}
+
+///|
+/// The `Capitalised` form of `word`: lower-case every character but keep the
+/// first one, upper-casing it when it is an ASCII lower-case letter.
+///
+/// Keeping the first character as it stands (instead of re-deriving it from the
+/// lower-cased string) is what lets `İZMİR` find the dictionary word `İzmir`:
+/// the Turkish capital dotted `İ` has no single-character ASCII upper form.
+/// `LANG tr` additionally maps `i`/`ı` to `İ`/`I` in that position.
+fn fold_capitalise(word : String, turkic : Bool) -> String {
+  let chars = word.to_array()
+  if chars.length() == 0 {
+    return word
+  }
+  let buffer = StringBuilder()
+  let first = chars[0]
+  if turkic && first == 'i' {
+    buffer.write_char('İ')
+  } else if turkic && first == 'ı' {
+    buffer.write_char('I')
+  } else if first.is_ascii_lowercase() {
+    buffer.write_char(first.to_ascii_uppercase())
+  } else {
+    buffer.write_char(first)
+  }
+  let mut index = 1
+  while index < chars.length() {
+    let c = chars[index]
+    if turkic && c == 'I' {
+      buffer.write_char('ı')
+    } else if c == 'İ' {
+      buffer.write_char('i')
+    } else {
+      buffer.write_char(@unicode.to_lowercase(c))
+    }
+    index = index + 1
+  }
+  buffer.to_string()
+}
+
+///|
+/// `fold_lower` with the dictionary's `LANG`-selected casing rules.
+fn Dictionary::fold_lower(self : Dictionary, word : String) -> String {
+  fold_lower(word, self.turkic)
+}
+
+///|
+/// `fold_capitalise` with the dictionary's `LANG`-selected casing rules.
+fn Dictionary::fold_capitalise(self : Dictionary, word : String) -> String {
+  fold_capitalise(word, self.turkic)
 }

@@ -157,8 +157,8 @@ test "two-part compounds with COMPOUNDFLAG and COMPOUNDMIN" {
   assert_true(dictionary.check("abcd"))
   assert_false(dictionary.check("foobaz"))
   assert_false(dictionary.check("f"))
-  // only the simple two-part case is implemented
-  assert_false(dictionary.check("foobarfoo"))
+  // compounds of three parts and more are handled by the recursive engine
+  assert_true(dictionary.check("foobarfoo"))
 }
 
 ///|
@@ -590,7 +590,9 @@ test "homonym entries are alternatives, not a union of flags" {
 }
 
 ///|
-test "a FORBIDDENWORD homonym forbids the whole word" {
+test "a FORBIDDENWORD homonym leaves the root homonyms alone" {
+  // The manual's "excepts with root homonyms": a spelling listed once as a root
+  // and once as forbidden stays correct through the root.
   let aff =
     #|SET UTF-8
     #|FORBIDDENWORD F
@@ -598,6 +600,18 @@ test "a FORBIDDENWORD homonym forbids the whole word" {
     #|2
     #|bad/F
     #|bad
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("bad"))
+}
+
+///|
+test "a FORBIDDENWORD-only spelling is rejected" {
+  let aff =
+    #|SET UTF-8
+    #|FORBIDDENWORD F
+  let dic =
+    #|1
+    #|bad/F
   let dictionary = load(aff, dic)
   assert_false(dictionary.check("bad"))
 }
@@ -769,4 +783,407 @@ test "text after the .dic count on the same line is ignored" {
   assert_true(dictionary.check("cat"))
   assert_true(dictionary.check("dog"))
   assert_eq(dictionary.entry_count(), 2)
+}
+
+///|
+test "COMPLEXPREFIXES stacks two prefixes on one stem" {
+  let aff =
+    #|SET UTF-8
+    #|COMPLEXPREFIXES
+    #|PFX B Y 1
+    #|PFX B 0 met/A .
+    #|PFX A Y 1
+    #|PFX A 0 tek .
+  let dic =
+    #|1
+    #|root/B
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("root"))
+  assert_true(dictionary.check("metroot"))
+  // the inner prefix hands its continuation flag `A` to the outer prefix
+  assert_true(dictionary.check("tekmetroot"))
+  // `A` is not licensed on the bare stem, and `B` is not handed out by `A`
+  assert_false(dictionary.check("tekroot"))
+  assert_false(dictionary.check("mettekroot"))
+}
+
+///|
+test "COMPLEXPREFIXES keeps a single suffix level" {
+  let aff =
+    #|SET UTF-8
+    #|COMPLEXPREFIXES
+    #|SFX A Y 1
+    #|SFX A 0 x/B .
+    #|SFX B Y 1
+    #|SFX B 0 y .
+  let dic =
+    #|1
+    #|root/A
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("rootx"))
+  // twofold suffix stripping is traded away for the prefix level
+  assert_false(dictionary.check("rootxy"))
+}
+
+///|
+test "three-part compounds use COMPOUNDBEGIN/MIDDLE/END" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDBEGIN B
+    #|COMPOUNDMIDDLE M
+    #|COMPOUNDEND E
+    #|COMPOUNDMIN 1
+  let dic =
+    #|3
+    #|aa/B
+    #|bb/M
+    #|cc/E
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("aabbcc"))
+  // `bb` is not a first part, `aa` is not a last part
+  assert_false(dictionary.check("bbaacc"))
+  assert_false(dictionary.check("aabb"))
+}
+
+///|
+test "an interior affix in a compound needs COMPOUNDPERMITFLAG" {
+  let with_permit =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 2
+    #|COMPOUNDPERMITFLAG P
+    #|SFX S Y 1
+    #|SFX S 0 suf/CP .
+  let without_permit =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 2
+    #|SFX S Y 1
+    #|SFX S 0 suf/C .
+  let dic =
+    #|2
+    #|aa/CS
+    #|bb/C
+  assert_true(load(with_permit, dic).check("aasufbb"))
+  assert_false(load(without_permit, dic).check("aasufbb"))
+}
+
+///|
+test "COMPOUNDFORBIDFLAG forbids compounding an affixed form" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDFORBIDFLAG Z
+    #|SFX S Y 1
+    #|SFX S 0 suf/CZ .
+  let dic =
+    #|2
+    #|aa/CS
+    #|bb/C
+  let dictionary = load(aff, dic)
+  // the affixed form itself is a word ...
+  assert_true(dictionary.check("aasuf"))
+  // ... but it may not be a compound part
+  assert_false(dictionary.check("aasufbb"))
+}
+
+///|
+test "CHECKCOMPOUNDPATTERN forbids a boundary" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 2
+    #|CHECKCOMPOUNDPATTERN 1
+    #|CHECKCOMPOUNDPATTERN b c
+  let dic =
+    #|3
+    #|ab/C
+    #|cd/C
+    #|ef/C
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("abcd"))
+  assert_true(dictionary.check("abef"))
+}
+
+///|
+test "CHECKCOMPOUNDPATTERN allows the replacement form" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 2
+    #|CHECKCOMPOUNDPATTERN 1
+    #|CHECKCOMPOUNDPATTERN om b Q
+  let dic =
+    #|2
+    #|krom/C
+    #|blip/C
+  let dictionary = load(aff, dic)
+  // krom + blip is forbidden at the `om`+`b` boundary ...
+  assert_false(dictionary.check("kromblip"))
+  // ... but its simplified form drops `om` and `b` and inserts `Q`
+  assert_true(dictionary.check("krQlip"))
+}
+
+///|
+test "CHECKCOMPOUNDPATTERN flags come from a continuation class" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDPERMITFLAG P
+    #|CHECKCOMPOUNDPATTERN 1
+    #|CHECKCOMPOUNDPATTERN /A /B
+    #|SFX S Y 1
+    #|SFX S 0 suf/CPA .
+    #|SFX T Y 1
+    #|SFX T 0 t/CPB .
+  let dic =
+    #|2
+    #|aa/CS
+    #|bb/CT
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("aasufbbt"))
+}
+
+///|
+test "CHECKCOMPOUNDDUP forbids a repeated last part" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 2
+    #|CHECKCOMPOUNDDUP
+  let dic =
+    #|2
+    #|aa/C
+    #|bb/C
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("aabb"))
+  assert_false(dictionary.check("aaaa"))
+  assert_false(dictionary.check("aabbbb"))
+}
+
+///|
+test "CHECKCOMPOUNDTRIPLE forbids three equal letters at the boundary" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|CHECKCOMPOUNDTRIPLE
+  let dic =
+    #|2
+    #|bell/C
+    #|lamp/C
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("belllamp"))
+  assert_true(dictionary.check("lampbell"))
+}
+
+///|
+test "SIMPLIFIEDTRIPLE accepts the two-letter form" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 2
+    #|CHECKCOMPOUNDTRIPLE
+    #|SIMPLIFIEDTRIPLE
+  let dic =
+    #|2
+    #|bell/C
+    #|lamp/C
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("belllamp"))
+  assert_true(dictionary.check("bellamp"))
+}
+
+///|
+test "CHECKCOMPOUNDCASE forbids an upper-case letter at a boundary" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|CHECKCOMPOUNDCASE
+  let dic =
+    #|2
+    #|abc/C
+    #|Zap/C
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("abcZap"))
+  assert_true(dictionary.check("Zapabc"))
+}
+
+///|
+test "COMPOUNDWORDMAX limits the number of parts" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 1
+    #|COMPOUNDWORDMAX 2
+  let dic =
+    #|3
+    #|aa/C
+    #|bb/C
+    #|cc/C
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("aabb"))
+  assert_false(dictionary.check("aabbcc"))
+}
+
+///|
+test "COMPOUNDSYLLABLE allows more parts when the vowel count is low" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 1
+    #|COMPOUNDWORDMAX 2
+    #|COMPOUNDSYLLABLE 3 aeiou
+  let dic =
+    #|3
+    #|aa/C
+    #|bb/C
+    #|cc/C
+  let dictionary = load(aff, dic)
+  // `aabbcc` has two vowels, so the word-count limit is lifted
+  assert_true(dictionary.check("aabbcc"))
+}
+
+///|
+test "FORCEUCASE forces a capitalised compound" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 2
+    #|FORCEUCASE F
+  let dic =
+    #|2
+    #|aa/C
+    #|bb/CF
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("aabb"))
+  assert_true(dictionary.check("Aabb"))
+  assert_true(dictionary.check("AABB"))
+}
+
+///|
+test "PSEUDOROOT is the old name of NEEDAFFIX" {
+  let aff =
+    #|SET UTF-8
+    #|PSEUDOROOT X
+    #|SFX A Y 1
+    #|SFX A 0 s .
+  let dic =
+    #|1
+    #|root/XA
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("root"))
+  assert_true(dictionary.check("roots"))
+}
+
+///|
+test "CIRCUMFIX needs an affix of the opposite kind" {
+  let aff =
+    #|SET UTF-8
+    #|CIRCUMFIX X
+    #|PFX P Y 1
+    #|PFX P 0 pre/X .
+    #|SFX S Y 1
+    #|SFX S 0 suf/X .
+  let dic =
+    #|1
+    #|root/PS
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("root"))
+  assert_false(dictionary.check("preroot"))
+  assert_false(dictionary.check("rootsuf"))
+  assert_true(dictionary.check("prerootsuf"))
+}
+
+///|
+test "LANG tr uses the Turkic dotted/dotless I casing" {
+  let aff =
+    #|SET UTF-8
+    #|LANG tr
+  let dic =
+    #|2
+    #|iç
+    #|ışık
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("iç"))
+  assert_true(dictionary.check("İç"))
+  assert_true(dictionary.check("ışık"))
+  assert_true(dictionary.check("Işık"))
+  assert_false(dictionary.check("Iç"))
+  assert_false(dictionary.check("İşık"))
+}
+
+///|
+test "a .dic word pair blocks the space-free compound" {
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 2
+  let dic =
+    #|3
+    #|aa/C
+    #|bb/C
+    #|aa bb
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("aa bb"))
+  assert_true(dictionary.check("bbaa"))
+  assert_false(dictionary.check("aabb"))
+}
+
+///|
+test "an affix rule may omit its condition" {
+  let aff =
+    #|SET UTF-8
+    #|SFX A Y 1
+    #|SFX A 0 ing
+  let dic =
+    #|1
+    #|go/A
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("going"))
+}
+
+///|
+test "a leading slash in a .dic entry is part of the word" {
+  let aff =
+    #|SET UTF-8
+    #|WORDCHARS /
+    #|SFX A Y 1
+    #|SFX A 0 a .
+  let dic =
+    #|2
+    #|/aa
+    #|/bb/A
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("/aa"))
+  assert_true(dictionary.check("/bb"))
+  assert_true(dictionary.check("/bba"))
+  assert_false(dictionary.check("/aaa"))
+}
+
+///|
+test "non-ASCII decimal digits count as a number word" {
+  let aff =
+    #|SET UTF-8
+    #|WORDCHARS ۰۱۲۳
+  let dic =
+    #|1
+    #|hello
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("۱۲"))
+  assert_false(dictionary.check("۱۲a"))
+}
+
+///|
+test "an affixed form of a forbidden word is forbidden" {
+  let aff =
+    #|SET UTF-8
+    #|FORBIDDENWORD F
+    #|SFX A Y 1
+    #|SFX A 0 s .
+  let dic =
+    #|1
+    #|banned/FA
+  let dictionary = load(aff, dic)
+  assert_false(dictionary.check("banned"))
+  assert_false(dictionary.check("banneds"))
 }
