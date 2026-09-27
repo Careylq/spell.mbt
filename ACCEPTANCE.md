@@ -6,7 +6,7 @@
 | # | 章程要求 | 状态 | 证据位置 |
 |---|---|---|---|
 | 1 | 项目以 **MoonBit 为主要实现语言** | ✅ | 全仓库 `.mbt` 源码；纯 MoonBit，零 FFI，无其它语言实现核心逻辑 |
-| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；commit 历史连续、有意义（35 个） |
+| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；commit 历史连续、有意义（36 个） |
 | 3 | 源代码结构清晰，**能完成声明的核心功能** | ✅ | `src/aff`（.aff 解析）`src/dic`（.dic 解析）`src/affix`（条件匹配）`src/spell`（判定引擎）`src/suggest`（建议引擎）`src/api`（公开 API）`cmd/main`（CLI） |
 | 4 | 提供 **README**：项目目标 / 安装方式 / 使用方法 / 示例 / **可复现** | ✅ | `README.mbt.md`（`README.md` 为其符号链接）；含 Quick start、CLI 用法、可复现步骤 |
 | 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | `.github/workflows/ci.yml` → `moon check` / `moon build` / `moon test` + 跨后端构建 + 符合率报告 |
