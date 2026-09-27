@@ -103,3 +103,47 @@ test "drop_slash_tokens keeps the other words on the line" {
   assert_eq(drop_slash_tokens("see src/api and docs/x.md now"), "see  and  now")
   assert_eq(drop_slash_tokens("no paths here"), "no paths here")
 }
+
+///|
+test "exit_status gates on misspellings unless --no-fail is given" {
+  // A clean scan is always 0.
+  assert_eq(exit_status(0, true), 0)
+  assert_eq(exit_status(0, false), 0)
+  // Misspellings fail the run. This is the whole point of the tool: a CI step
+  // can gate on a typo without parsing the output.
+  assert_eq(exit_status(1, true), 1)
+  assert_eq(exit_status(2, true), 1)
+  // `--no-fail` opts out, for callers that only want the numbers.
+  assert_eq(exit_status(1, false), 0)
+}
+
+///|
+test "parse_options defaults fail_on_hits on, and --no-fail clears it" {
+  let default = match
+    parse_options(["doccheck", "--aff", "a.aff", "--dic", "a.dic"]) {
+    Ok(options) => options
+    Err(message) => abort("unexpected error: \{message}")
+  }
+  assert_true(default.fail_on_hits)
+  assert_false(default.quiet)
+  assert_false(default.include_tests)
+  let opted_out = match
+    parse_options(["doccheck", "--aff", "a.aff", "--dic", "a.dic", "--no-fail"]) {
+    Ok(options) => options
+    Err(message) => abort("unexpected error: \{message}")
+  }
+  assert_false(opted_out.fail_on_hits)
+  // `--no-fail` must not disturb the other options.
+  assert_eq(opted_out.dir, ".")
+  assert_eq(opted_out.aff, Some("a.aff"))
+  assert_eq(opted_out.dic, Some("a.dic"))
+  // It is a flag, so it takes no value: a trailing word is the directory.
+  let with_dir = match
+    parse_options([
+      "doccheck", "--aff", "a.aff", "--dic", "a.dic", "--no-fail", "docs",
+    ]) {
+    Ok(options) => options
+    Err(message) => abort("unexpected error: \{message}")
+  }
+  assert_eq(with_dir.dir, "docs")
+}

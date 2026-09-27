@@ -271,6 +271,10 @@ backend, with the ecosystem's own tools:
 bash examples/doccheck/run.sh          # scans this repository
 ```
 
+It exits **1 when anything is still misspelled**, so a CI step can gate on a typo
+without parsing the output (`0` clean, `1` misspellings found, `2` usage/I-O error;
+`--no-fail` forces `0` for callers that only want the numbers).
+
 Measured on this repository (`moon 0.1.20260920`, en_US from LibreOffice/SCOWL size 60,
 fetched at run time and never vendored):
 

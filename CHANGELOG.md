@@ -4,7 +4,31 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
-## [0.9.1] — 2026-09-27
+## [0.9.2] — 2026-09-27
+
+Makes the dogfooding example's exit code usable as a CI gate. Library code is
+untouched, so conformance and benchmark numbers cannot change and were not re-run.
+
+### Added
+- `examples/doccheck` now exits **1 when anything is still misspelled** after the
+  allowlist, `0` when clean, and `2` on a usage or I/O error; `--no-fail` forces `0`
+  for callers that only want the numbers (which is how the recorded measurements are
+  taken). The wrapper `run.sh` passes `--no-fail` through — without that it would have
+  been read as the target directory.
+- 2 whitebox tests: `exit_status` and the `--no-fail` parse (including that a trailing
+  directory after the flag is still the directory). Tests 176 → 178 (wasm, wasm-gc,
+  js), 180 → 182 (native).
+
+### Why
+The project application form's second usage scenario promises a tool whose "exit status
+can be embedded in a pipeline to intercept spelling errors automatically". Before this
+change `doccheck` returned `0` no matter how many misspellings it found, so the claim
+was not actually true — the exit code only reported argument and I/O failures. The
+library CLI (`cmd/main check`) deliberately still exits `0` on a rejected word: it
+reports one verdict per line, and the conformance and benchmark harnesses read that
+stream and would break if a rejected word failed the process. Gating is `doccheck`'s job.
+
+
 
 Measurement correction, two performance fixes, and tests for a previously untested
 function. **No spelling judgement changed** — confirmed by the full suite, the full

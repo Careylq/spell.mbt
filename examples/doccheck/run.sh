@@ -7,6 +7,12 @@
 #   bash examples/doccheck/run.sh path/to/other/repo    # scan another tree
 #   bash examples/doccheck/run.sh --include-tests       # also scan *_test.mbt
 #   bash examples/doccheck/run.sh --quiet               # summary only
+#   bash examples/doccheck/run.sh --no-fail             # always exit 0
+#
+# Exit status (so a CI step can gate on a typo without parsing the output):
+#   0  no misspelling left after the allowlist
+#   1  misspellings found
+#   2  usage or I/O error
 #
 # The English dictionary is en_US from LibreOffice's `dictionaries` repository
 # (built from SCOWL, size 60). It is fetched from jsDelivr at run time into a
@@ -47,7 +53,7 @@ TARGET="$REPO_ROOT"
 PASS=()
 for arg in "$@"; do
   case "$arg" in
-    --include-tests | --quiet) PASS+=("$arg") ;;
+    --include-tests | --quiet | --no-fail) PASS+=("$arg") ;;
     -h | --help) exec moon run examples/doccheck -- --help ;;
     *) TARGET="$arg" ;;
   esac

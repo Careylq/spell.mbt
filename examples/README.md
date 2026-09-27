@@ -127,6 +127,33 @@ With `--include-tests` the remaining 11 are the deliberate fixtures and suffix
 fragments in test comments (`abc`, `aeiou`, `krom`, `sxzh`, `-ication`, ...);
 that is exactly why the default scope leaves test files out.
 
+### Exit status (CI gating)
+
+`doccheck` exits **1 when anything is still misspelled** after the allowlist, so a
+CI step can gate on a typo without parsing the output:
+
+```bash
+if bash examples/doccheck/run.sh --quiet; then
+  echo "docs are clean"
+else
+  echo "docs have misspellings"   # the step fails here
+fi
+```
+
+| code | meaning |
+|---|---|
+| `0` | no misspelling left after the allowlist |
+| `1` | misspellings found |
+| `2` | usage or I/O error |
+
+`--no-fail` forces `0` even when misspellings are found, for callers that only want
+the numbers — which is how the measurements in this file were taken.
+
+> The library CLI (`moon run cmd/main -- check ...`) deliberately keeps exiting `0`
+> on a rejected word: it reports **verdicts**, one per line, and the conformance and
+> benchmark harnesses read that stream and would break if a rejected word failed the
+> process. Gating is `doccheck`'s job.
+
 ### Known false positives and false negatives
 
 The extractor is deliberately thin, so it misclassifies some text:

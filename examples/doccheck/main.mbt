@@ -41,6 +41,8 @@ struct Options {
   allowlist : String?
   include_tests : Bool
   quiet : Bool
+  /// Whether misspellings make the process exit 1 (`--no-fail` clears it).
+  fail_on_hits : Bool
   dir : String
 }
 
@@ -93,6 +95,21 @@ fn command_args() -> Array[String] {
 }
 
 ///|
+/// The process exit status for a finished scan.
+///
+/// `0` means "nothing to report" and `1` means "misspellings were found". `1` is
+/// the point of the tool: it lets a CI step fail on a typo without parsing the
+/// output. `--no-fail` turns that off for callers that only want the numbers,
+/// such as this repository's own measurement runs.
+fn exit_status(hits : Int, fail_on_hits : Bool) -> Int {
+  if hits > 0 && fail_on_hits {
+    1
+  } else {
+    0
+  }
+}
+
+///|
 /// Parse, scan, and report; returns the process exit status.
 fn run(args : Array[String]) -> Int {
   if wants_help(args) {
@@ -127,14 +144,14 @@ fn run(args : Array[String]) -> Int {
     Ok(text) => text
     Err(message) => {
       eprintln("doccheck: \{message}")
-      return 1
+      return 2
     }
   }
   let dic_text = match read_text(dic_path) {
     Ok(text) => text
     Err(message) => {
       eprintln("doccheck: \{message}")
-      return 1
+      return 2
     }
   }
   let allowlist = match options.allowlist {
@@ -144,7 +161,7 @@ fn run(args : Array[String]) -> Int {
         Ok(words) => words
         Err(message) => {
           eprintln("doccheck: \{message}")
-          return 1
+          return 2
         }
       }
   }
@@ -158,7 +175,7 @@ fn run(args : Array[String]) -> Int {
     Ok(dictionary) => dictionary
     Err(message) => {
       eprintln("doccheck: \{message}")
-      return 1
+      return 2
     }
   }
   let report : Report = {
@@ -172,11 +189,11 @@ fn run(args : Array[String]) -> Int {
   let root = normalize_dir(options.dir)
   if !is_directory(root) {
     eprintln("doccheck: not a directory: \{root}")
-    return 1
+    return 2
   }
   scan_directory(root, root, dictionary, report, options.include_tests)
   print_summary(report)
-  0
+  exit_status(report.hits, options.fail_on_hits)
 }
 
 ///|
@@ -193,7 +210,13 @@ fn print_usage() -> Unit {
     #|  --allowlist <path>  extra correct words, one per line (# comments allowed)
     #|  --include-tests     also scan *_test.mbt and *_wbtest.mbt
     #|  --quiet             print only the summary
+    #|  --no-fail           exit 0 even when misspellings are found
     #|  -h, --help          show this message
+    #|
+    #|exit status:
+    #|  0  no misspelling left after the allowlist
+    #|  1  misspellings found (so the step can gate a CI run)
+    #|  2  usage or I/O error
     #|
     #|Run it with the wrapper, which fetches the dictionary at run time:
     #|  bash examples/doccheck/run.sh [--include-tests] [<dir>]
@@ -219,6 +242,7 @@ fn parse_options(args : Array[String]) -> Result[Options, String] {
   let mut allowlist : String? = None
   let mut include_tests = false
   let mut quiet = false
+  let mut fail_on_hits = true
   let mut dir : String? = None
   let mut index = 1
   while index < args.length() {
@@ -253,6 +277,9 @@ fn parse_options(args : Array[String]) -> Result[Options, String] {
     } else if arg == "--quiet" {
       quiet = true
       index = index + 1
+    } else if arg == "--no-fail" {
+      fail_on_hits = false
+      index = index + 1
     } else if arg.has_prefix("-") {
       return Err("unknown option \"\{arg}\"")
     } else {
@@ -271,6 +298,7 @@ fn parse_options(args : Array[String]) -> Result[Options, String] {
     allowlist,
     include_tests,
     quiet,
+    fail_on_hits,
     dir: match dir {
       Some(path) => path
       None => "."
