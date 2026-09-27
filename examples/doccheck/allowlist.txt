@@ -1,0 +1,123 @@
+# doccheck allowlist — project words a general en_US dictionary does not know.
+#
+# One word per line; `#` starts a comment and blank lines are ignored. Each
+# entry is added to the dictionary verbatim *and* in lower case, so a
+# capitalised spelling is accepted too. A mixed-case spelling (MoonBit, macOS)
+# therefore needs its own line: the library's capitalisation rule only maps a
+# capitalised word to its lower-case entry, not to a mixed-case one.
+#
+# Every line here is a word this repository legitimately uses; none of them is
+# a typo. The measured before/after numbers are in examples/README.md and the
+# repository README's "Ecosystem" section — do not treat this file as a claim
+# that the first run was clean.
+
+# --- the project, its toolchain and its runtime vocabulary ---------------
+MoonBit
+moonbit
+mooncakes
+moonrun
+mbt
+wasm
+llvm
+toolchain
+backend
+backends
+struct
+num
+dir
+subdir
+toplevel
+pre
+arg
+args
+dup
+mov
+symlink
+backtick
+allowlist
+dogfooding
+camelCase
+runtimes
+subcommand
+subcommands
+microbenchmarks
+benchmarked
+positionally
+mappable
+multiplicatively
+injective
+recurse
+lookups
+accessors
+matcher
+rescan
+rescanned
+unanchored
+unescaped
+unclosed
+unterminated
+deduplicated
+Deduplication
+seekable
+runnable
+vendored
+substring
+blackbox
+whitebox
+stdin
+stdout
+stderr
+jitter
+aspell
+nuspell
+Changelog
+WordNet
+Indic
+KiB
+GiB
+
+# --- Hunspell / affix terminology ----------------------------------------
+hunspell
+aff
+dic
+ngram
+endchars
+circumfix
+checksharps
+compoundrule
+Fuge
+harakat
+SingleChar
+
+# --- British spellings, used consistently throughout this repository -----
+capitalisation
+capitalised
+decapitalisation
+decapitalising
+judgement
+licence
+licences
+behaviour
+modelled
+Unmodelled
+recognised
+optimisation
+normalise
+normalises
+parenthesised
+neighbour
+neighbours
+neighbouring
+honoured
+tokenisation
+tokenising
+uppercased
+whitespace
+
+# --- proper nouns --------------------------------------------------------
+macOS
+jsDelivr
+
+# --- ordinary English words a size-60 SCOWL list omits -------------------
+misclassifies
+tokenizers

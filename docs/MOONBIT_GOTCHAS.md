@@ -410,6 +410,22 @@ printf 'hello\nzzzz\n' | moon run cmd/main -- check --aff a.aff --dic d.dic --wo
   给 `AffFile` 加 `lang : String` 后写新快照很容易忘。
 - **正确写法**：`content="\"tr\""`，或照同文件里 `ignore_chars` 的写法用多行 `#|"tr"`。
 
+## 41. `String::substring` 已废弃（0020）→ 用切片 `s[start:end]`
+
+- **症状**：`path.substring(start=3)` 触发 warning 0020
+  `Use 'str[:]' or 'str[:].to_string()' instead`；`--deny-warn` 下直接失败。
+- **正确写法**：切片语法返回 `StringView`，需要 `String` 就接 `.to_owned()`：
+  ```moonbit
+  let head = dic_text[:index].to_owned()
+  let tail = dic_text[index + 1:].to_owned()
+  let rest = path[prefix.length():].to_owned()
+  ```
+  只想剥掉前缀时 `strip_prefix`（返回 `StringView?`）更直白。
+- **实测**：`examples/doccheck` 里四处 `substring` 换成切片后，
+  `moon check --deny-warn --target all` 干净通过。
+- **同族**：`trim()` / `trim_start()` / `trim_end()` 返回的也是 `StringView`，
+  直接 `has_prefix` / `has_suffix` 没问题，但要当 `String` 传递就得 `.to_owned()`。
+
 ---
 
 ## 附二：实现过程中被测试抓出来的两个真 bug（值得记住）

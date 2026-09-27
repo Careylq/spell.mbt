@@ -80,6 +80,15 @@ pub fn entry_count(dictionary : Dictionary) -> Int {
 /// A word that `check` accepts needs no correction, so the result is empty.
 /// Every returned candidate is a word `check` accepts. See
 /// `@suggest.suggest` for the candidate sources and the ranking.
+///
+/// ```mbt check
+/// test {
+///   let dictionary = @api.load(
+///     "SET UTF-8\nTRY abcdefghijklmnopqrstuvwxyz\nREP 1\nREP ph f", "2\nform\nphantom",
+///   )
+///   assert_eq(@api.suggest(dictionary, "phorm", 5), ["form"])
+/// }
+/// ```
 pub fn suggest(
   dictionary : Dictionary,
   word : String,

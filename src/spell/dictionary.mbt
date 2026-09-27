@@ -15,6 +15,8 @@ pub(all) suberror SpellError {
 }
 
 ///|
+/// `"aff: line N: message"` or `"dic: line N: message"`, naming the file that
+/// failed.
 pub impl Show for SpellError with fn to_string(self) {
   match self {
     AffParse(error) => ".aff: \{error.to_string()}"

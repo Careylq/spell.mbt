@@ -750,4 +750,84 @@ PFX D A a/PX A
 
 ---
 
+## 2026-09-27 · Day 9 — 生态相关性：公开 API 文档 + `doccheck` 吃自己的狗粮
+
+**背景**
+- 评审四个维度里，「与 MoonBit 生态的相关性」此前从未被专门做过。前三个维度
+  （完整性、代码质量、开源合规）已有大量投入，这一条是明显短板。
+- 本日只做这一条：把「一个纯 MoonBit 的、数据驱动的文本库」真正接进 MoonBit
+  生态的使用方式（`moon doc`、mooncakes 包页、可运行示例、dogfooding），并留下
+  可复现的实测数字。
+
+**做了什么**
+
+1. **公开 API 文档审计**。用脚本枚举所有 `pub` 声明与 `pub(all)` 结构体/枚举字段，
+   逐个检查是否有 `///` 文档。结论：函数、类型、方法此前已经写得相当完整（例如
+   `parse_aff`/`parse_dic`/`apply_rule`/`matches_condition`/`Dictionary::from_text`
+   都有「做什么 + 行为/错误」两段）。真正的缺口只有：
+   - `src/aff/ast.mbt` 里 `AffFile`、`SpecialFlags`、`Replacement`、`PhoneRule`、
+     `Conversion`、`AffixKind` 的公开字段没有逐字段说明；
+   - `src/dic/ast.mbt` 的 `DicFile.declared_count`；
+   - 三处 `pub impl Show` 没有文档；
+   - 门面 `suggest` 没有可编译示例。
+   逐条补齐后重新跑审计脚本，**剩余缺口 0**。`moon doc` 生成的 HTML 里能搜到新
+   文档（例如 “The count on the first line”），说明渲染正确。
+
+2. **`examples/doccheck`：让本库给 MoonBit 项目的文档和注释查错**。
+   - MoonBit 可执行包，只依赖 `Careylq/spell` + `moonbitlang/x/fs` 等；
+     判定全部走 `@spell.check`，不调用任何外部拼写器。
+   - 抽取规则（源码头部与 `examples/README.md` 都写了）：只读 `*.md` / `*.mbt.md`
+     与 `*.mbt` 的 `///`、`//` 行；Markdown 里跳过围栏代码块、行内代码、HTML 注释、
+     链接目标与含 `/` 的路径/URL；`///` 里的围栏代码块也跳过（否则 `mbt check`
+     示例会被当成散文）；候选词必须是纯 ASCII 字母串，紧邻数字/`.`/`_` 的串、
+     全大写串、非 ASCII 串一律丢弃；所有格归并到词根，其他含撇号的词跳过；
+     小于 3 个字母的词跳过。
+   - 允许表 `allowlist.txt`：把词条原样和全小写插进 `.dic` 文本再 `load`，
+     所以「这个词算不算对」仍然是库在判定，而不是在库外面绕过。
+   - 一条命令：`bash examples/doccheck/run.sh`（脚本在运行时从 jsDelivr 取
+     LibreOffice 的 en_US，缓存到临时目录，**不 vendor**）。
+
+3. **在本仓库上实测（真实运行，非估算）**
+
+   | 运行 | 文件 | 检查词数 | 判错 token | 去重词数 |
+   |---|---|---|---|---|
+   | 首次，无允许表 | 32 | 16,602 | 461 | 110 |
+   | 加 `allowlist.txt`（101 条） | 32 | 16,602 | **0** | **0** |
+   | `--include-tests`（带允许表） | 46 | 18,042 | 14 | 11 |
+
+   **110 个去重词逐个人工复核：真拼写错误 0 个，假阳性 110 个。** 分类是：项目术语
+   （`wasm`、`stdin`、`backend`、`aff`、`dic`）、Hunspell 术语（`Fuge`、`endchars`、
+   `circumfix`、`ngram`）、专有名词（`MoonBit`、`macOS`、`jsDelivr`、`WordNet`、
+   `aspell`、`nuspell`）、英式拼写（`judgement`、`licence`、`behaviour`、`modelled`）、
+   以及 SCOWL size 60 恰好没有的普通词（`seekable`、`runnable`、`matcher`、
+   `lookups`、`substring`、`unclosed`）。它们全部进了允许表。
+   `--include-tests` 剩下的 11 个是测试注释里故意的错拼与后缀片段
+   （`abc`、`aeiou`、`krom`、`sxzh`、`-ication`……）——这正是默认不扫测试文件的原因。
+
+   **诚实结论**：通用英语词典在技术仓库上首次运行几乎 100% 是假阳性，
+   允许表不是「锦上添花」，而是让工具可用的必需机制。这也顺带证明了不能靠
+   「首次运行是否干净」来判断这类工具的价值。真拼写错误是 0，是实测结果，
+   不是为了好看而写的 0。
+
+**新增的坑（编译器和运行时验证）**
+- `String::substring` 已废弃（warning 0020），`--deny-warn` 下直接失败；改用切片
+  `s[start:end]` / `s[start:]`（返回 `StringView`，要 `String` 就 `.to_owned()`）
+  或 `strip_prefix`。已补进 `docs/MOONBIT_GOTCHAS.md` 第 41 条。
+- 写这个示例时真的踩出一个抽取 bug：`drop_slash_tokens` 复用 `StringBuilder` 却没重置，
+  导致相邻单词被拼成一个词（`theconditionisread`）。编译器不会报，只有跑输出才能
+  看出来——再次印证「能编译 ≠ 正确」。
+
+**测试与验证**
+- `examples/doccheck` 新增 9 个白盒测试（抽取规则、围栏、允许表合并、路径过滤）。
+- `moon check --deny-warn --target all` 干净；`moon fmt` / `moon info` 已跑。
+- 符合率未回归：`.good` 825/848、`.wrong` 611/613、`.sug` 141/173（重测命令见
+  README 的 Conformance 一节）。
+
+**仍然没做 / 局限**
+- 抽取器很薄，已知假阳性与假阴性都写在 `examples/README.md`：未闭合反引号会漏文本、
+  多行字符串里的 `//` 会被当注释、连字符词按两个词查、拼写正确但用错的词一律查不出。
+- `--include-tests` 会报出测试夹具，故意不把它们加进允许表。
+
+---
+
 ## 待续

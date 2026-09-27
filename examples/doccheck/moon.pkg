@@ -1,0 +1,16 @@
+// `doccheck` — dogfooding example: spell-check this repository's own
+// documentation and MoonBit comments with the library it ships.
+//
+// It is a real executable package, so `moon check` type-checks it and
+// `moon test` runs its whitebox tests. The spelling decision always goes
+// through `@spell.check`; no external speller is involved.
+import {
+  "Careylq/spell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/x/fs",
+  "moonbitlang/x/sys",
+  "moonbitlang/x/unicode",
+}
+
+pkgtype(kind: "executable")

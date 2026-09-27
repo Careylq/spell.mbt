@@ -14,6 +14,7 @@ pub(all) suberror AffParseError {
 } derive(Eq, @debug.Debug)
 
 ///|
+/// `"line N: message"`, the form used by error messages and logs.
 pub impl Show for AffParseError with fn to_string(self) {
   match self {
     AffParseError(line~, message~) => "line \{line}: \{message}"

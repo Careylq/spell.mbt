@@ -40,6 +40,8 @@ pub(all) struct DicEntry {
 /// sometimes stale, and the manual's count is advisory, so a mismatch is not an
 /// error.
 pub(all) struct DicFile {
+  /// The count on the first line. Advisory only: real dictionaries are
+  /// sometimes stale, so it is neither checked nor corrected.
   declared_count : Int
   /// Every entry line after the count line, in source order.
   entries : Array[DicEntry]

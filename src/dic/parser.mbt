@@ -25,6 +25,7 @@ pub(all) suberror DicParseError {
 } derive(Eq, @debug.Debug)
 
 ///|
+/// `"line N: message"`, the form used by error messages and logs.
 pub impl Show for DicParseError with fn to_string(self) {
   match self {
     DicParseError(line~, message~) => "line \{line}: \{message}"

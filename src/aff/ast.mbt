@@ -27,13 +27,16 @@ pub(all) enum FlagType {
 ///|
 /// Whether an affix is attached before (`Prefix`) or after (`Suffix`) the stem.
 pub(all) enum AffixKind {
+  /// The affix is attached before the stem (`PFX`).
   Prefix
+  /// The affix is attached after the stem (`SFX`).
   Suffix
 } derive(Eq, @debug.Debug)
 
 ///|
 /// The header line of a `PFX`/`SFX` block: `PFX flag cross_product count`.
 pub(all) struct AffixHeader {
+  /// Whether this header declared a `PFX` or an `SFX` block.
   kind : AffixKind
   /// The flag selecting this block. Numeric `AF` alias indices are resolved to
   /// the alias string while parsing.
@@ -47,6 +50,7 @@ pub(all) struct AffixHeader {
 ///|
 /// One `PFX`/`SFX` rule line: `PFX flag strip add condition [morph...]`.
 pub(all) struct AffixRule {
+  /// Whether the rule adds before or after the stem; copied from the header.
   kind : AffixKind
   /// The flag selecting this rule. Numeric `AF` alias indices are resolved to
   /// the alias string while parsing.
@@ -71,7 +75,9 @@ pub(all) struct AffixRule {
 /// `from`/`to` are stored verbatim, so the Hunspell convention of `_` for a
 /// space is preserved and must be interpreted by the consumer.
 pub(all) struct Replacement {
+  /// The text to look for.
   from : String
+  /// The text to replace it with.
   to : String
 } derive(Eq, @debug.Debug)
 
@@ -83,7 +89,9 @@ pub(all) struct Replacement {
 /// classes, leading/trailing `-`, `<`, digit priorities, `^`, `$`); `_` as a
 /// replacement means "output nothing".
 pub(all) struct PhoneRule {
+  /// The Aspell/Hunspell phonetic pattern, verbatim.
   pattern : String
+  /// The replacement text; `_` means "output nothing".
   replacement : String
 } derive(Eq, @debug.Debug)
 
@@ -95,7 +103,9 @@ pub(all) struct PhoneRule {
 /// the last character of the word, as the manual's `ICONV <200D>_ <FFF0>`
 /// example describes); the consumer strips and interprets it.
 pub(all) struct Conversion {
+  /// The input sequence, verbatim (a trailing `_` for `ICONV` means end of word).
   from : String
+  /// The output sequence.
   to : String
 } derive(Eq, @debug.Debug)
 
@@ -105,11 +115,19 @@ pub(all) struct Conversion {
 /// `None` means the directive was absent. Values are stored verbatim (see
 /// `parse_aff` for how `AF` aliases are handled).
 pub(all) struct SpecialFlags {
+  /// `NOSUGGEST`: never offer the word as a suggestion.
   nosuggest : String?
+  /// `KEEPCASE`: the word is only correct in the exact spelling given.
   keepcase : String?
+  /// `FORBIDDENWORD`: the word is always wrong, even as an affixed form.
   forbiddenword : String?
+  /// `NEEDAFFIX` (or its deprecated spelling `PSEUDOROOT`): the bare stem is not
+  /// a word, only an affixed form of it is.
   needaffix : String?
+  /// `CIRCUMFIX`: an affix carrying this flag must be paired with one of the
+  /// opposite kind carrying it too.
   circumfix : String?
+  /// `ONLYINCOMPOUND`: the word is only correct inside a compound.
   onlyincompound : String?
 } derive(Eq, @debug.Debug)
 
@@ -132,7 +150,9 @@ pub(all) struct UnknownDirective {
 /// own default of `3` is a matching-time concern for a later slice). `encoding`
 /// is `""` when the file has no `SET` line.
 pub(all) struct AffFile {
+  /// `SET`: the declared encoding; `""` when the directive is absent.
   encoding : String
+  /// `FLAG`: how flags are encoded in both files.
   flag_type : FlagType
   /// `LANG`: the language code, used for the Turkic `I`/`İ` casing rules
   /// (`LANG tr`, `az`, `crh`). `""` when the directive is absent.
@@ -159,9 +179,13 @@ pub(all) struct AffFile {
   /// `OCONV` output-conversion pairs, in source order. Applied to suggestion
   /// output only.
   oconv : Array[Conversion]
+  /// `TRY`: the characters the suggestion engine may substitute or insert.
   try_chars : String
+  /// `KEY`: the keyboard layout, one row per `|`-separated group.
   keyboard : String
+  /// `IGNORE`: characters to drop before comparing words.
   ignore_chars : String
+  /// `WORDCHARS`: extra characters that may appear inside a word.
   word_chars : String
   /// `CHECKSHARPS`: German `ß` may be written `SS` in an uppercased word, and a
   /// `KEEPCASE` word containing `ß` may be capitalised or uppercased (but its
@@ -179,11 +203,17 @@ pub(all) struct AffFile {
   /// The `BREAK` patterns, verbatim. A leading `^` or trailing `$` means "strip
   /// that text at the start" or "at the end" instead of splitting there.
   break_patterns : Array[String]
+  /// `COMPOUNDMIN`: minimum length of a compound part; `0` when absent.
   compound_min : Int
+  /// `COMPOUNDFLAG`: the flag a word needs to be any part of a compound.
   compound_flag : String?
+  /// `COMPOUNDBEGIN`: the flag a word needs to start a compound.
   compound_begin : String?
+  /// `COMPOUNDEND`: the flag a word needs to end a compound.
   compound_end : String?
+  /// `COMPOUNDMIDDLE`: the flag a word needs to sit inside a compound.
   compound_middle : String?
+  /// `COMPOUNDRULE` patterns, verbatim (e.g. `n*mp`).
   compound_rules : Array[String]
   /// `COMPOUNDPERMITFLAG`: an affix carrying this flag may sit *inside* a
   /// compound (a prefix that is not at the very front, or a suffix that is not
@@ -201,14 +231,23 @@ pub(all) struct AffFile {
   /// `COMPOUNDSYLLABLE max_syllable vowels`: Hungarian syllable-count limit;
   /// `compound_syllable_max` is `0` when the directive is absent.
   compound_syllable_max : Int
+  /// The `vowels` argument of `COMPOUNDSYLLABLE`.
   compound_syllable_vowels : String
+  /// `CHECKCOMPOUNDDUP`: no compound part may be repeated.
   check_compound_dup : Bool
+  /// `CHECKCOMPOUNDTRIPLE`: no three identical characters across a compound
+  /// boundary.
   check_compound_triple : Bool
+  /// `CHECKCOMPOUNDREP`: reject a compound that a `REP` rule can turn into a
+  /// dictionary word.
   check_compound_repeat : Bool
+  /// `SIMPLIFIEDTRIPLE`: allow a simplified letter at a compound boundary.
   check_compound_simplified_triple : Bool
   /// `CHECKCOMPOUNDCASE`: forbid upper-case characters at a compound boundary.
   check_compound_case : Bool
+  /// `CHECKCOMPOUNDPATTERN` lines, verbatim; parsed at match time.
   check_compound_pattern : Array[String]
+  /// The special-flag directives, collected.
   special_flags : SpecialFlags
   /// Directives with no typed field above, in source order.
   unrecognized : Array[UnknownDirective]

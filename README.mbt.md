@@ -11,7 +11,7 @@ for the words it rejects.
 > code block below is verified by `moon check`. `README.md` is a symlink to this file
 > so that GitHub renders it.
 
-> **Status: 0.7.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
+> **Status: 0.8.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
 > judgement engine, the suggestion engine, the public API and the `check` /
 > `suggest` CLI subcommands are implemented and tested on all four backends. See
 > [Not implemented yet](#not-implemented-yet) for what suggestion generation
@@ -204,6 +204,57 @@ parser, no affix morphology, no spell judgement. Related packages solve differen
 problems (`moonlexicon` is multi-pattern string matching; `moonnlp` and
 `tokenizers-moonbit` are NLP/LLM tokenizers). This project fills that gap.
 
+## Ecosystem relevance
+
+The contribution this project makes to MoonBit is not only "a spell checker exists".
+It is that a real, standard, data-driven text task runs in pure MoonBit, on every
+backend, with the ecosystem's own tools:
+
+* **Pure MoonBit, no FFI.** All six library packages (`src/aff`, `src/dic`, `src/affix`,
+  `src/spell`, `src/suggest`, `src/api`) are MoonBit only. The library is therefore
+  usable from wasm, wasm-gc, js and native alike — the test suite passes on each of the
+  four backends.
+* **A real dictionary format, not a toy word list.** It reads the Hunspell
+  `.aff`/`.dic` files that LibreOffice, Firefox and macOS already ship, so a MoonBit
+  program can consume existing language data instead of a bespoke format.
+* **A wasm-first text component.** `preferred_target = "wasm"`; the CLI is ~103 KiB of
+  wasm with no C++ runtime, which is the shape a browser or edge-worker text feature
+  wants.
+* **An API a MoonBit developer can actually read.** `moon doc` / the mooncakes.io page
+  carries a `///` comment for every public item, and the module root
+  (`import { "Careylq/spell" }`) is a nine-item facade — `load`, `check`, `suggest`
+  and four metadata accessors.
+* **Dogfooding.** `examples/doccheck` uses this library, through its own public API, to
+  spell-check the prose of a MoonBit repository: it extracts candidate words from
+  Markdown and from `///` / `//` comments and reports what the library rejects, with
+  file and line. It is a working demonstration of the library as a component, not a
+  snippet.
+
+### What the dogfooding run found
+
+```bash
+bash examples/doccheck/run.sh          # scans this repository
+```
+
+Measured on this repository (`moon 0.1.20260920`, en_US from LibreOffice/SCOWL size 60,
+fetched at run time and never vendored):
+
+| run | words checked | misspelled tokens | distinct words |
+|---|---|---|---|
+| first run, no allowlist | 16,602 | 461 | 110 |
+| with `examples/doccheck/allowlist.txt` | 16,602 | 0 | 0 |
+
+**Of the 110 distinct words the first run flagged, 0 were real typos and 110 were false
+positives.** They are project vocabulary (`wasm`, `backend`, `aff`), Hunspell
+terminology (`Fuge`, `endchars`, `ngram`), MoonBit and third-party proper nouns
+(`MoonBit`, `macOS`, `jsDelivr`), British spellings (`judgement`, `licence`, `modelled`)
+and ordinary words this SCOWL size omits (`seekable`, `matcher`, `substring`). All of
+them are now in the allowlist. That is the honest result: a general English dictionary
+is a poor fit for a technical repository, and the allowlist is what makes the tool
+usable, not a formality. The full rules, the `--include-tests` numbers
+(14 tokens, 11 distinct, all deliberate fixtures) and the known false positives are in
+[examples/README.md](examples/README.md#examplesdoccheck).
+
 ## Install
 
 ```bash
@@ -281,6 +332,18 @@ the detected encoding, flag mode, affix-rule count and entry count, and then jud
 list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`,
 `unhappy`) and special-flag cases (`EBOOK` rejected because `ebook` is `KEEPCASE`). See
 [examples/README.md](examples/README.md).
+
+The second example, `examples/doccheck`, spell-checks a whole MoonBit project's
+documentation and comments with this library:
+
+```bash
+bash examples/doccheck/run.sh
+```
+
+It is the dogfooding example described under
+[Ecosystem relevance](#ecosystem-relevance); see
+[examples/README.md](examples/README.md#examplesdoccheck) for its extraction rules, its
+allowlist and the measured numbers.
 
 ## Scope
 
@@ -406,7 +469,8 @@ list of words including affix-derived forms (`cats`, `boxes`, `happied`, `undos`
     alphabetical tiebreak.
 - **Public façade** — `src/api` plus a re-export from the module root: `load`, `check`,
   `suggest`, `encoding`, `flag_type_name`, `rule_count`, `entry_count`.
-- **Runnable example** in `examples/basic`.
+- **Runnable examples** — `examples/basic` (the API end to end) and `examples/doccheck`
+  (the library spell-checking a MoonBit repository's own prose).
 
 **Build status:** `moon check` reports 0 errors and 0 warnings; the test suite passes on
 each of wasm, wasm-gc, js and native.
@@ -473,7 +537,7 @@ src/spell/    spell() judgement: indexed dictionary, reverse lookup, case rules
 src/suggest/  suggest(): REP, edit distance 1/2, case, splitting, ranking
 src/api/      public facade: load, check, suggest, metadata
 cmd/main/     CLI (the `check` and `suggest` subcommands)
-examples/     runnable examples
+examples/     runnable examples (`basic`, `doccheck`)
 conformance/  conformance harnesses (`run.sh` for .good/.wrong, `suggest.sh` for .sug)
 ```
 

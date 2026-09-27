@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
+## [0.8.0] — 2026-09-27
+
+Ecosystem work. No functional change; `.good` 825/848, `.wrong` 611/613 and `.sug` 141/173 are
+unchanged. Tests 154 → 164 (wasm/wasm-gc/js) and 158 → 168 (native).
+
+### Added
+- **`///` documentation for every public item**, including the previously undocumented public
+  fields of `AffFile`, `SpecialFlags`, `Replacement`, `PhoneRule`, `Conversion`, `AffixKind`,
+  `AffixHeader.kind`, `AffixRule.kind` and `DicFile.declared_count`, plus a compiling example on
+  `api.suggest`. `moon doc` and the mooncakes.io page now describe the whole API.
+- **`examples/doccheck`** — a MoonBit executable that uses this library's public API to spell-check
+  the prose of a MoonBit repository: it extracts candidate words from Markdown and `///` / `//`
+  comments, skips fenced blocks, inline code, paths and identifiers, and reports what the library
+  rejects with file and line. Run with `bash examples/doccheck/run.sh`. It fetches en_US at run time
+  and never vendors it.
+- An allowlist mechanism for domain vocabulary, with the categories documented.
+
+### Measured
+On this repository: 32 files, 16,602 words, **461 flagged tokens / 110 distinct words** on the first
+run; 0 after applying the 101-entry allowlist. **Of the 110, none were real typos — all were false
+positives** of a general English dictionary on technical prose. That is reported as the actual
+result: the allowlist is what makes the tool usable, not a formality.
+
 ## [0.7.0] — 2026-09-27
 
 Conformance closeout. `.good` **730/848 → 825/848 (97.3%)**, `.wrong` **579/613 → 611/613 (99.7%)**,
