@@ -98,6 +98,15 @@ pub fn parse_aff(text : String) -> AffFile raise AffParseError {
       "OCONV" => index = parse_conversion(builder.oconv, lines, index, line)
       "TRY" => builder.try_chars = arg_at(line, 1, name)
       "KEY" => builder.keyboard = arg_at(line, 1, name)
+      "MAXNGRAMSUGS" =>
+        builder.max_ngram_sugs = Some(
+          parse_count(arg_at(line, 1, name), line.number, name),
+        )
+      "MAXDIFF" =>
+        builder.max_diff = Some(
+          parse_count(arg_at(line, 1, name), line.number, name),
+        )
+      "ONLYMAXDIFF" => builder.only_max_diff = true
       "IGNORE" => builder.ignore_chars = arg_at(line, 1, name)
       "WORDCHARS" => builder.word_chars = arg_at(line, 1, name)
       "CHECKSHARPS" => builder.check_sharps = true
@@ -205,6 +214,9 @@ priv struct AffBuilder {
   oconv : Array[Conversion]
   mut try_chars : String
   mut keyboard : String
+  mut max_ngram_sugs : Int?
+  mut max_diff : Int?
+  mut only_max_diff : Bool
   mut ignore_chars : String
   mut word_chars : String
   mut check_sharps : Bool
@@ -257,6 +269,9 @@ fn new_builder() -> AffBuilder {
     oconv: [],
     try_chars: "",
     keyboard: "",
+    max_ngram_sugs: None,
+    max_diff: None,
+    only_max_diff: false,
     ignore_chars: "",
     word_chars: "",
     check_sharps: false,
@@ -317,6 +332,9 @@ fn finish(builder : AffBuilder) -> AffFile {
     oconv: builder.oconv,
     try_chars: builder.try_chars,
     keyboard: builder.keyboard,
+    max_ngram_sugs: builder.max_ngram_sugs,
+    max_diff: builder.max_diff,
+    only_max_diff: builder.only_max_diff,
     ignore_chars: builder.ignore_chars,
     word_chars: builder.word_chars,
     check_sharps: builder.check_sharps,

@@ -32,6 +32,9 @@ pub(all) struct AffFile {
   oconv : Array[Conversion]
   try_chars : String
   keyboard : String
+  max_ngram_sugs : Int?
+  max_diff : Int?
+  only_max_diff : Bool
   ignore_chars : String
   word_chars : String
   check_sharps : Bool

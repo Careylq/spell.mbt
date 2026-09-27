@@ -11,7 +11,7 @@
 | 4 | 提供 **README**：项目目标 / 安装方式 / 使用方法 / 示例 / **可复现** | ✅ | `README.mbt.md`（`README.md` 为其符号链接）；含 Quick start、CLI 用法、可复现步骤 |
 | 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | `.github/workflows/ci.yml` → `moon check` / `moon build` / `moon test` + 跨后端构建 |
 | 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ | `examples/basic`（`moon run examples/basic` 可直接运行，输出判定结果） |
-| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **154 个测试**（native 158 个），四个后端全部通过；另有符合率框架 `conformance/` |
+| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **166 个测试**（native 170 个），四个后端全部通过；另有符合率框架 `conformance/` |
 | 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.3.0`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
 | 9 | 采用 **OSI 认可的开源许可证** | ✅ | `LICENSE` = Apache-2.0 |
 | 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | `NOTICE`：参考 Hunspell（LGPL-2.1）的**格式规范与可观察行为**，未复制源码；测试语料不随仓库分发 |
@@ -26,8 +26,17 @@
 期望的最佳建议被产出 **141/173 = 81.5%**（按输入顺序做最大单调配对）；
 期望最佳即我方第一条 **124/173 = 71.7%**；
 完全复现整个 `.sug` 文件（Hunspell 自己的判据）**7/37 套**。
-未通过的部分需要 ngram/`MAXNGRAMSUGS` 候选生成与 `FORCEUCASE` 驱动的建议通道，
-已在 README 的「Not implemented yet」中点名。
+
+ngram 通道**未实现，且是刻意不猜**：`MAXNGRAMSUGS` / `MAXDIFF` / `ONLYMAXDIFF`
+已解析进 AST（不再落进 `unrecognized`），但 `hunspell(5)` 手册只写了这是
+「基于公共 1/2/3/4 字符序列的相似度检索」并给出 `MAXDIFF` 的默认值 5、范围 0–10
+和 `ONLYMAXDIFF` 的「去掉所有差的 ngram 建议」，**没有给相似度评分公式**（各阶
+n-gram 权重、归一化、阈值、`MAXNGRAMSUGS` 默认值、何为「差」都没有定义）；
+该算法只存在于 LGPL-2.1 的 `suggestmgr.cxx`，本项目不能复制，因此不猜测评分函数。
+另需说明：37 个 `.sug` 套件中 12 个显式写 `MAXNGRAMSUGS 0` 关闭该通道，
+只有 `1463589`、`1463589_utf`、`base_utf` 写 `1`。
+`FORCEUCASE` 驱动的建议通道同样未实现。两点均已在 README 的
+「Not implemented yet」中点名。
 
 ## 提交前的最后检查
 

@@ -830,4 +830,58 @@ PFX D A a/PX A
 
 ---
 
+## 2026-09-27 · Day 10 — ngram 通道：把手册读完，然后诚实地不做
+
+**做了什么**
+- 复核 `hunspell(5)` 手册里 ngram 相关的**全部**内容（Ubuntu 1.7.0 / 1.7.2、
+  Arch 1.7.3、语料自带的 `man/hunspell.5`，以及它的匈牙利语译本
+  `man/hu/hunspell.5`）。它只写了四件事：
+  * 建议参数一节：ngram 是「基于公共 1/2/3/4 字符序列的词典相似度检索」；
+  * `MAXNGRAMSUGS num`：最多几条 ngram 建议，`0` 关闭；
+  * `MAXDIFF [0-10]`：相似度因子，默认 `5`，`0` = 更少但至少 1 条，
+    `10` = `MAXNGRAMSUGS`；
+  * `ONLYMAXDIFF`：去掉所有「差的」ngram 建议（默认保留一条）。
+- 唯一的额外信息来自匈牙利语译本：它给 `MAXNGRAMSUGS` 标了一个默认值 `5`
+  （英文原文没写默认值），并说建议是按「n 长片段匹配」**加权**的——但仍然没有权重、
+  没有公式、没有阈值。连默认值都只出现在译本里，说明不能靠手册复刻评分。
+- 因此**没有实现 ngram 评分**：手册没有写各阶 n-gram 的权重、归一化、`MAXDIFF`
+  对应的阈值、`MAXNGRAMSUGS` 的默认值，也没有定义什么叫「差」。这些只存在于
+  Hunspell 的 LGPL-2.1 `suggestmgr.cxx`，本项目不能复制，评分函数不能猜。
+- 实现了手册里**说得清楚**的那一半：解析 `MAXNGRAMSUGS` / `MAXDIFF` /
+  `ONLYMAXDIFF` 进 AST（`AffFile::max_ngram_sugs` / `max_diff` / `only_max_diff`），
+  它们不再落进 `unrecognized`。缺失用 `Int?` 表示，所以「文件没写」与「写了 0
+  （关闭）」可以区分——这正是 `MAXNGRAMSUGS 0` 的语义需要的。
+
+**设计取舍**
+- **不猜评分函数**。任务明确「猜出来的评分器比诚实的缺口更糟」；而且实测语料里
+  37 个 `.sug` 套件有 12 个显式 `MAXNGRAMSUGS 0`（关闭）、3 个写 `1`、其余没写。
+  猜一个默认开启的 ngram 通道，最可能的结果是把这 12 个套件**弄回归**，而不是提高
+  通过率。宁可不做。
+- **AST 保真**：`max_ngram_sugs` / `max_diff` 用 `Int?` 而非 `Int`，因为手册只给了
+  `MAXDIFF` 的默认值 5，没给 `MAXNGRAMSUGS` 的默认值；`None` 表示「文件没写」，
+  默认值留给未来的消费者决定。`MAXDIFF` 的值按文件原样存（不因超出 0–10 报错），
+  避免真实词典里一个越界值让整个 `.aff` 解析失败。
+
+**测试与验证**
+- `src/aff/aff_test.mbt` 新增 2 个测试：三条指令被解析且 `unrecognized` 为空；
+  缺省为 `None`/`false`，而 `MAXNGRAMSUGS 0` 是 `Some(0)` 而不是 `None`。
+- 全后端：wasm / wasm-gc / js **166/166**，native **170/170**。
+- `moon check --deny-warn --target all` 干净；`moon fmt` / `moon info` 已跑。
+- 符合率重测**未回归**：`.good` 825/848、`.wrong` 611/613、`.sug` 141/173
+  （as-first 124/173、exact 7/37）。
+
+**仍然没做 / 局限**
+- ngram 候选生成与 `FORCEUCASE` 驱动的建议仍缺席，缺席原因（手册未定义评分）已写进
+  README「Not implemented yet」。
+- 通道性能未测——没有通道就没有可测的通道成本。作为参照，当前（无词典扫描的）建议
+  引擎在真实 `en_US`（49,568 条）上约 **0.26 s 载入 + 每词约 0.04 s**
+  （wasm/moonrun，含进程启动，5 词 0.57 s、20 词 1.04 s、空输入 0.26 s）。
+  任何未来的 ngram 通道都要对每个错词扫全词典，必须先用长度窗口/早停限界再上线。
+- `docs/MOONBIT_GOTCHAS.md` 本次**没有新增条目**：给 `pub(all) struct` 加字段、
+  字段类型用 `Int?` 在本工具链上 `moon check --deny-warn` 干净通过，没有触发新坑；
+  且「加字段不需要新 `extend`」已由第 37 条覆盖。按该文件「只记验证过的坑」的约定，
+  不硬凑条目。
+
+---
+
 ## 待续

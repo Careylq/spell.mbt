@@ -11,7 +11,7 @@ for the words it rejects.
 > code block below is verified by `moon check`. `README.md` is a symlink to this file
 > so that GitHub renders it.
 
-> **Status: 0.8.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
+> **Status: 0.9.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
 > judgement engine, the suggestion engine, the public API and the `check` /
 > `suggest` CLI subcommands are implemented and tested on all four backends. See
 > [Not implemented yet](#not-implemented-yet) for what suggestion generation
@@ -51,10 +51,19 @@ line-by-line positional pairing is impossible. Exactly what was counted:
 The `MAP` related-character groups and the `ph:`/`PHONE` phonetic passes are
 implemented, which is where most of the suggestion improvement came from: `map` and
 `maputf` went from 0/3 to 3/3 each, `ph` from 3/11 to 11/11 and `ph2` from 1/14 to
-14/14. The remaining `.sug` gap is dominated by the passes that are still out of
-scope: the ngram/`MAXNGRAMSUGS` candidate generator and `FORCEUCASE`-driven
-suggestions. Where the corpus needs those, the library returns fewer (or no)
-suggestions; it never invents one `check` rejects.
+14/14. The remaining `.sug` gap is dominated by passes that are still out of scope:
+the n-gram candidate generator and `FORCEUCASE`-driven suggestions. Where the corpus
+needs those, the library returns fewer (or no) suggestions; it never invents one
+`check` rejects.
+
+The three `.aff` directives that configure the n-gram pass — `MAXNGRAMSUGS`,
+`MAXDIFF` and `ONLYMAXDIFF` — are now parsed and recorded on the AST
+(`AffFile::max_ngram_sugs`, `AffFile::max_diff`, `AffFile::only_max_diff`) instead of
+landing in `AffFile::unrecognized`. The pass itself is deliberately **not**
+implemented: the `hunspell(5)` manual does not define its similarity score, so there
+is nothing to implement it from without guessing (see
+[Not implemented yet](#not-implemented-yet)). These conformance numbers were
+re-measured after that parser change and are unchanged.
 
 The remaining `.good` gap is now 23 words, and 16 of those are the harness
 measurement artifact described below (`morph.good`). The genuinely missing seven come
@@ -467,6 +476,10 @@ allowlist and the measured numbers.
     `REP`/`ph:` hits rank first, then keyboard-adjacent (via `KEY`) typos, then early `TRY`
     characters, then shorter edit distance, with the phonetic candidates last, and an
     alphabetical tiebreak.
+  * **no n-gram tier** — `MAXNGRAMSUGS`, `MAXDIFF` and `ONLYMAXDIFF` are parsed into the
+    AST, but no n-gram candidate is generated, because the `hunspell(5)` manual does not
+    define the similarity score (see [Not implemented yet](#not-implemented-yet)). A
+    future tier would be a *fallback* below the passes above, not a replacement for them.
 - **Public façade** — `src/api` plus a re-export from the module root: `load`, `check`,
   `suggest`, `encoding`, `flag_type_name`, `rule_count`, `entry_count`.
 - **Runnable examples** — `examples/basic` (the API end to end) and `examples/doccheck`
@@ -494,17 +507,34 @@ each of wasm, wasm-gc, js and native.
   describe it, so it is not guessed at.
 - **`COMPOUNDROOT` / `SYLLABLENUM`** — parsed into the AST but not applied; no corpus
   suite exercises them.
-- **Suggestion quality beyond the implemented passes** — there is no
-  ngram/`MAXNGRAMSUGS` candidate generator (`MAXNGRAMSUGS` is still only an unknown
-  directive, which is harmless while the generator itself is absent), and `FORCEUCASE`
-  does not drive a suggestion. Edit distance 2 is only the bounded O(n²) subset listed
-  above (no two arbitrary replacements, no replacement-plus-insertion). The `PHONE` pass
-  treats a `^^` pattern as a plain start anchor followed by re-scanning from the end of
-  the match instead of a fully separate sub-word (no corpus table uses `^^`). One
-  `COMPOUNDRULE`-style case also remains: a `CHECKCOMPOUNDPATTERN` replacement is not
-  tried when the *endchars* leave a doubled letter across the join (a contrived
-  `kroom`+`om b` case), matching Hunspell only for the corpus shapes. This is why `.sug`
-  is at 81.5% rather than higher.
+- **The n-gram candidate generator** — Hunspell's last suggestion channel is absent.
+  The `.aff` directives that configure it are parsed into the AST
+  (`AffFile::max_ngram_sugs`, `AffFile::max_diff`, `AffFile::only_max_diff`), but no
+  candidate is generated from them. The reason is that the `hunspell(5)` manual —
+  checked in every published form available: the English text in 1.7.0, 1.7.2 and
+  1.7.3, the corpus's own `man/hunspell.5`, and its Hungarian translation
+  (`man/hu/hunspell.5`, which alone names a default of `5` for `MAXNGRAMSUGS`; the
+  English text names none) — describes the pass only as a "similarity search through
+  the dictionary words based on common 1-, 2-, 3-, and 4-character sequences", and
+  gives `MAXDIFF`'s default (`5`) and range (`0`-`10`) plus `ONLYMAXDIFF`'s "remove
+  all bad n-gram suggestions". It never defines the score itself: the per-order n-gram
+  weights, the normalisation, the cutoff `MAXDIFF` selects, the default
+  `MAXNGRAMSUGS`, or what counts as a "bad" suggestion. That algorithm exists only in
+  Hunspell's LGPL-2.1 `suggestmgr.cxx`, which this Apache-2.0 project must not copy, so
+  the scorer is not guessed at. The gap is also not uniform across the corpus:
+  `MAXNGRAMSUGS 0` switches the pass off in 12 of the 37 `.sug` suites, `1463589`,
+  `1463589_utf` and `base_utf` set it to `1`, and the rest leave it at the default — so
+  a guessed scorer risks regressing at least the twelve that switch it off, rather than
+  only adding suggestions.
+- **Other suggestion refinements still out of scope** — `FORCEUCASE` is parsed and used
+  for judgement but does not drive a suggestion. Edit distance 2 is only the bounded
+  O(n²) subset listed above (no two arbitrary replacements, no
+  replacement-plus-insertion). The `PHONE` pass treats a `^^` pattern as a plain start
+  anchor followed by re-scanning from the end of the match instead of a fully separate
+  sub-word (no corpus table uses `^^`). One `COMPOUNDRULE`-style case also remains: a
+  `CHECKCOMPOUNDPATTERN` replacement is not tried when the *endchars* leave a doubled
+  letter across the join (a contrived `kroom`+`om b` case), matching Hunspell only for
+  the corpus shapes. This is why `.sug` is at 81.5% rather than higher.
 - **Unicode upper-casing beyond the special cases** — upper-casing is ASCII-only plus the
   explicit `İ`/`ı` and `ß` rules; a fully general Unicode case table is not shipped.
   `FULLSTRIP` needs no special code (a rule may already strip the whole stem) and

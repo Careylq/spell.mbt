@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
+## [0.9.0] — 2026-09-27
+
+Final closeout. No behaviour change; `.good` 825/848 (97.3%), `.wrong` 611/613 (99.7%) and
+`.sug` 141/173 (81.5%) are unchanged. Tests 164 → 166 (wasm/wasm-gc/js) and 168 → 170 (native).
+
+### Added
+- Parsed `MAXNGRAMSUGS`, `MAXDIFF` and `ONLYMAXDIFF` into the `.aff` AST
+  (`max_ngram_sugs : Int?`, `max_diff : Int?`, `only_max_diff : Bool`) instead of leaving them in
+  `unrecognized`. `Int?` distinguishes "absent" from a declared `0`.
+
+### Not implemented, deliberately not guessed
+- **The n-gram similarity scorer.** `hunspell(5)` specifies only that the pass is "similarity search
+  through the dictionary words based on common 1-, 2-, 3-, and 4-character sequences", plus the three
+  directive names. It defines **no** scoring function: no per-order weights, no normalisation, no
+  threshold formula, and no definition of what makes a suggestion "bad" — that exists only in
+  Hunspell's LGPL-2.1 `suggestmgr.cxx`, which this project must not copy. A scorer written from the
+  manual would be invention, so the gap is left open and documented. (Also relevant: 12 of the 37
+  `.sug` suites set `MAXNGRAMSUGS 0`, i.e. switch the pass *off*, so a guessed default-on scorer would
+  likely regress them.)
+- `FORCEUCASE`-driven suggestions, `ALL-CAPS` input against a mixed-case dictionary form, and the
+  Hungarian `LANG hu` moving rule — all named in the README with the reason each is not implemented.
+
 ## [0.8.0] — 2026-09-27
 
 Ecosystem work. No functional change; `.good` 825/848, `.wrong` 611/613 and `.sug` 141/173 are

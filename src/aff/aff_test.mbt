@@ -553,3 +553,31 @@ test "an affix rule condition may be omitted" {
   // the omitted condition defaults to `.`
   @debug.debug_inspect(aff.affix_rules[0].condition, content="\".\"")
 }
+
+///|
+test "the n-gram suggestion directives are parsed, not unrecognized" {
+  let text =
+    #|SET UTF-8
+    #|MAXNGRAMSUGS 4
+    #|MAXDIFF 8
+    #|ONLYMAXDIFF
+  let aff = @aff.parse_aff(text)
+  @debug.debug_inspect(aff.max_ngram_sugs, content="Some(4)")
+  @debug.debug_inspect(aff.max_diff, content="Some(8)")
+  @debug.debug_inspect(aff.only_max_diff, content="true")
+  @debug.debug_inspect(aff.unrecognized.length(), content="0")
+}
+
+///|
+test "an absent n-gram directive stays absent, and a declared 0 stays 0" {
+  let absent = @aff.parse_aff("SET UTF-8")
+  @debug.debug_inspect(absent.max_ngram_sugs, content="None")
+  @debug.debug_inspect(absent.max_diff, content="None")
+  @debug.debug_inspect(absent.only_max_diff, content="false")
+  // `MAXNGRAMSUGS 0` switches the pass off; it is not the same as absent.
+  let off =
+    #|SET UTF-8
+    #|MAXNGRAMSUGS 0
+  let parsed = @aff.parse_aff(off)
+  @debug.debug_inspect(parsed.max_ngram_sugs, content="Some(0)")
+}

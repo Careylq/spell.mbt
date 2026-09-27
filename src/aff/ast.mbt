@@ -183,6 +183,28 @@ pub(all) struct AffFile {
   try_chars : String
   /// `KEY`: the keyboard layout, one row per `|`-separated group.
   keyboard : String
+  /// `MAXNGRAMSUGS`: how many n-gram suggestions the n-gram pass may return;
+  /// `None` when the directive is absent. The manual documents that
+  /// `0` switches the pass off but does not state the default, so an absent
+  /// directive is kept distinct from a declared `0`.
+  ///
+  /// Parsed and recorded here only: no n-gram candidate generator consumes it
+  /// yet, because the manual does not specify the similarity scoring (see the
+  /// README's "Not implemented yet").
+  max_ngram_sugs : Int?
+  /// `MAXDIFF`: the n-gram similarity factor. `None` when the directive is
+  /// absent; the manual documents `5` as the default value and the range
+  /// `0`-`10` (`0` = fewer n-gram suggestions but at least one, `10` =
+  /// `MAXNGRAMSUGS` suggestions). The value is stored verbatim, so a file that
+  /// declares a value outside that range still parses.
+  ///
+  /// Parsed and recorded here only, like `max_ngram_sugs`.
+  max_diff : Int?
+  /// `ONLYMAXDIFF`: remove every "bad" n-gram suggestion instead of the default
+  /// behaviour of keeping one.
+  ///
+  /// Parsed and recorded here only, like `max_ngram_sugs`.
+  only_max_diff : Bool
   /// `IGNORE`: characters to drop before comparing words.
   ignore_chars : String
   /// `WORDCHARS`: extra characters that may appear inside a word.
