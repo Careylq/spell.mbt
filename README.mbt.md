@@ -188,6 +188,13 @@ access (`direct_hit`). Real text is miss-dominated here: `/usr/share/dict/words`
 is only 18.4% hits. **The miss path and dictionary load are the optimisation
 targets; direct lookup is already at parity.**
 
+> **Run-to-run range, so no single ratio is over-read.** Repeating `bash bench/run.sh`
+> on this machine moves the direct-hit row between **0.89× and 1.06×** (ours
+> 0.34–0.38 µs/word, hunspell 0.36–0.38) and the all-miss row between **6.30× and 6.44×**
+> (ours 9.38–9.60 µs/word, hunspell 1.49). That spread is why this section claims
+> *parity* on hits and "≈6× slower" on misses instead of quoting one run's ratio as if it
+> were a property of the code. The table above is one such run.
+
 As a cross-backend data point on the same 235,976 words: native release 1.910 s
 is **2.20×** faster than release wasm (4.201 s) and **2.50×** faster than the
 debug wasm that plain `moon run` builds (4.782 s).
@@ -272,20 +279,23 @@ bash examples/doccheck/run.sh          # scans this repository
 ```
 
 It exits **1 when anything is still misspelled**, so a CI step can gate on a typo
-without parsing the output (`0` clean, `1` misspellings found, `2` usage/I-O error;
-`--no-fail` forces `0` for callers that only want the numbers).
+without parsing the output (`0` clean, `1` misspellings found, `2` usage/I-O error; the
+wrapper adds `3` for "could not obtain the dictionary", so an environment failure cannot
+look like a documentation problem; `--no-fail` forces `0` for callers that only want the
+numbers). [`examples/ci-gate`](examples/ci-gate) verifies the contract offline, and this
+repository's own CI gates on it.
 
 Measured on this repository (`moon 0.1.20260920`, en_US from LibreOffice/SCOWL size 60,
 fetched at run time and never vendored). The word count depends on how much prose the
-repository carries, so these figures are a **snapshot of the 0.9.2 tree**; re-running the
+repository carries, so these figures are a **snapshot of the 0.9.5 tree**; re-running the
 command prints the current numbers:
 
 | run | words checked | misspelled tokens | distinct words |
 |---|---|---|---|
-| first run, no allowlist | 18,334 | 525 | 114 |
-| with `examples/doccheck/allowlist.txt` | 18,334 | 0 | 0 |
+| first run, no allowlist | 19,871 | 576 | 116 |
+| with `examples/doccheck/allowlist.txt` | 19,871 | 0 | 0 |
 
-**Of the 114 distinct words the first run flagged, 0 were real typos and 114 were false
+**Of the 116 distinct words the first run flagged, 0 were real typos and 116 were false
 positives.** They are project vocabulary (`wasm`, `backend`, `aff`), Hunspell
 terminology (`Fuge`, `endchars`, `ngram`), MoonBit and third-party proper nouns
 (`MoonBit`, `macOS`, `jsDelivr`), British spellings (`judgement`, `licence`, `modelled`)
@@ -652,6 +662,32 @@ moon fmt        # format
 moon info       # regenerate .mbti interfaces
 ```
 
+Before a submission, one command runs every gate and re-measures every published number,
+so the documentation cannot quietly go stale:
+
+```bash
+bash check-all.sh          # reports land in .final-check/
+```
+
+The two phases are different on purpose. **Phase 1 gates** — `moon check --deny-warn`,
+`moon fmt --check`, `moon test`, an unchanged `.mbti`, and the offline `doccheck`
+exit-status contract — and exits non-zero if any of them fails. **Phase 2 only reports** —
+conformance, `.sug`, the differential test, the benchmark and `doccheck` on this repository —
+saving each output to a file and never failing on drift. Nothing in either phase invents a
+number: a measurement that cannot run says so instead.
+
+This exists because each of the three stale figures in this project's history was found by
+re-running a measurement, never by reading the code.
+
+The examples are [`examples/basic`](examples/basic) (runnable end to end),
+[`examples/doccheck`](examples/doccheck) (spell-checks this repository's own prose, and exits
+non-zero when it finds a typo) and [`examples/ci-gate`](examples/ci-gate) (proves that exit
+status gates a build, offline).
+
+A Chinese companion README lives at [`README.zh.md`](README.zh.md). It is a `.mbt.md` file
+too, so its code blocks are compiled and its examples executed — the Chinese documentation
+cannot drift away from the code.
+
 ## Community articles
 
 - **《AI 写了 7300 行 MoonBit：编译器能验的，和验不了的》** — how this library was built
@@ -663,11 +699,13 @@ moon info       # regenerate .mbti interfaces
   - 掘金 — https://juejin.cn/post/7689644399769796649
 
   (Chinese. Every measured number in it was taken from this repository, but one has
-  moved since publication: the article and the cover say **178 / 182** tests and the
-  repository now has **179 / 183**, because the `mbt check` block added to the Quick start
-  above contains a `test` and is therefore executed by `moon test`. Where the article and
-  this repository ever disagree, this file and the scripts that produce it win — which is
-  the article's own point.)
+  moved since publication: the article and the cover say **178 / 182** tests, and the
+  repository now has **182 / 186**. Two of the three increments come from `mbt check`
+  blocks added to the Quick start above and to `README.zh.mbt.md`: a block containing a
+  `test` is executed by `moon test`, so documenting a behaviour now enforces it. The third
+  is the Chinese README's own examples. Where the article and this repository ever
+  disagree, this file and the scripts that produce it win — which is the article's own
+  point.)
 
 ## License
 

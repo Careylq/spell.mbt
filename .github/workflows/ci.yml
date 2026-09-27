@@ -76,3 +76,26 @@ jobs:
           else
             echo "conformance harness not implemented yet"
           fi
+
+      # --- Dogfooding: this gate is a BLOCKING step on this repository's own prose ---
+      # doccheck exits 0 clean / 1 misspellings / 2 usage or I-O error, and 3 when the
+      # wrapper could not fetch the dictionary at all. Failing on 1 and 2 while
+      # tolerating 3 is the whole point of separating them: an environment failure must
+      # not look like a documentation problem and must not mark the build red.
+      # See examples/ci-gate/README.md.
+      - name: Spell-check this repository's own documentation
+        run: |
+          rc=0
+          bash examples/doccheck/run.sh --quiet || rc=$?
+          if [ "$rc" = "3" ]; then
+            echo "::warning::could not obtain the dictionary; doccheck was skipped"
+            exit 0
+          fi
+          if [ "$rc" != "0" ]; then
+            echo "::error::doccheck exited $rc"
+          fi
+          exit "$rc"
+
+      # --- The exit-status contract itself, verified offline (no network, no data) ---
+      - name: doccheck exit-status contract
+        run: bash examples/ci-gate/run.sh

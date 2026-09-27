@@ -11,8 +11,13 @@
 #
 # Exit status (so a CI step can gate on a typo without parsing the output):
 #   0  no misspelling left after the allowlist
-#   1  misspellings found
-#   2  usage or I/O error
+#   1  misspellings found                       <- the gate
+#   2  usage or I/O error (bad flag, unreadable file, not a directory)
+#   3  this WRAPPER could not obtain the dictionary (no network, no cache)
+#
+# 3 exists so that an environment failure cannot masquerade as a documentation
+# problem: a CI step can fail on 1 and 2 while tolerating 3, which is exactly what
+# .github/workflows/ci.yml does. The program itself never returns 3.
 #
 # The English dictionary is en_US from LibreOffice's `dictionaries` repository
 # (built from SCOWL, size 60). It is fetched from jsDelivr at run time into a
@@ -43,7 +48,9 @@ if [ -z "$DICT_DIR" ]; then
        || ! curl -fsSL "$BASE/en_US.dic" -o "$DICT_DIR/en_US.dic"; then
       echo "doccheck: could not fetch the dictionary." >&2
       echo "          Set SPELL_DICT_DIR to a directory with en_US.aff/en_US.dic." >&2
-      exit 1
+      # 3, not 1: this is an environment failure, not a spelling result. See the
+      # header for why that distinction has to survive to the caller.
+      exit 3
     fi
   fi
 fi

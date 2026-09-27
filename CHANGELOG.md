@@ -4,6 +4,47 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
+## [0.9.5] — 2026-09-27
+
+Documentation, examples and CI. No library code or interface change.
+Tests 179/183 -> **182/186**, all three additions coming from `mbt check` blocks in the new
+Chinese README being executed by `moon test` (wasm, wasm-gc, js / native).
+
+### Added
+- **`README.zh.mbt.md` + `README.zh.md` symlink** — a Chinese companion to the README.
+  It is a `.mbt.md` file rather than plain Markdown on purpose: its code blocks are then
+  compiled by `moon check` and its `test` blocks executed by `moon test`, so the Chinese
+  documentation cannot rot independently of the code it documents. The English README
+  stays authoritative and says so.
+- **`examples/ci-gate`** — an offline, self-contained demonstration that `doccheck`'s exit
+  status really gates a build. It writes a five-word dictionary from scratch (no network,
+  nothing vendored) and asserts five cases, then prints the workflow snippet it is
+  describing. This exists because the project's application form promised a tool whose
+  "exit status can be embedded in a pipeline to intercept spelling errors
+  automatically", and a promise in prose is not a demonstration.
+- **`check-all.sh`** — one command for the pre-submission check. Phase 1 is gates
+  (`moon check`, `fmt`, `test`, an unchanged `.mbti`, and the offline exit-status
+  contract); phase 2 re-measures everything and reports drift without failing. This
+  repository's history includes a 2.3x performance figure that had silently drifted, a
+  conformance figure 1.9 points too low for weeks, and a doccheck figure invalidated by
+  the documentation it described — all three were found by re-running a measurement.
+
+### Fixed
+- `examples/doccheck/run.sh` returned **1** when it could not fetch the dictionary, which
+  collides with `1` = "misspellings found" and would report an environment failure as a
+  documentation problem. It now returns **3** for that case; the contract is
+  0 clean / 1 misspellings / 2 usage or I-O error / 3 no dictionary. Verified reachable by
+  hiding the cache and pointing the fetch at a dead port.
+- `.github/workflows/ci.yml` now runs **two more steps**, both blocking: the repository's
+  own prose is spell-checked (tolerating only exit 3, so a network flake is not reported
+  as a typo), and the offline exit-status contract is asserted.
+- The Performance section now states the **run-to-run range** of the ratios it quotes
+  (direct hits 0.89x-1.06x, misses 6.30x-6.44x) instead of leaving one run's ratio to be
+  read as a property of the code.
+- `misconfiguration` was flagged by our own gate while the new prose was being written and
+  was added to the allowlist — the workflow that `examples/ci-gate/README.md` tells users
+  to follow, followed by us.
+
 ## [0.9.4] — 2026-09-27
 
 Documentation only. No code, test or interface change.

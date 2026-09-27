@@ -107,16 +107,16 @@ is not clean, and the numbers below are from actual runs, not estimates.
 ### Measured on this repository (moon 0.1.20260920, en_US SCOWL size 60)
 
 The word count grows with the repository's own prose, so these are a **snapshot of the
-0.9.2 tree**; re-running the command prints the current figures.
+0.9.5 tree**; re-running the command prints the current figures.
 
 | run | files | words checked | misspelled tokens | distinct words |
 |---|---|---|---|---|
-| first run, no allowlist | 32 | 18,334 | 525 | 114 |
-| after `allowlist.txt` (105 entries) | 32 | 18,334 | **0** | **0** |
-| `--include-tests` (allowlist on) | 46 | 19,974 | 14 | 11 |
+| first run, no allowlist | 34 | 19,871 | 576 | 116 |
+| after `allowlist.txt` (107 entries) | 34 | 19,871 | **0** | **0** |
+| `--include-tests` (allowlist on) | 48 | 21,511 | 14 | 11 |
 
-All 114 distinct words the first run flagged were reviewed by hand: **none was a
-typo.** 114 of 114 were false positives of a general dictionary on a technical
+All 116 distinct words the first run flagged were reviewed by hand: **none was a
+typo.** 116 of 116 were false positives of a general dictionary on a technical
 repository — project vocabulary (`wasm`, `stdin`, `backend`, `aff`, `dic`), the
 Hunspell/affix terminology this project is about (`Fuge`, `endchars`,
 `circumfix`, `ngram`, `checksharps`), MoonBit and third-party proper nouns
@@ -143,11 +143,17 @@ else
 fi
 ```
 
-| code | meaning |
-|---|---|
-| `0` | no misspelling left after the allowlist |
-| `1` | misspellings found |
-| `2` | usage or I/O error |
+| code | meaning | who returns it |
+|---|---|---|
+| `0` | no misspelling left after the allowlist | program |
+| `1` | misspellings found | program |
+| `2` | usage or I/O error | program |
+| `3` | the **wrapper** could not obtain the dictionary | `run.sh` only |
+
+`3` exists so an environment failure cannot masquerade as a documentation problem: a CI
+step can fail on `1` and `2` (a real result, or a real misconfiguration) while tolerating
+`3` (no network and no cache). `.github/workflows/ci.yml` does exactly that.
+`examples/ci-gate` verifies the `0`/`1`/`2` half of the contract offline.
 
 `--no-fail` forces `0` even when misspellings are found, for callers that only want
 the numbers — which is how the measurements in this file were taken.
@@ -174,6 +180,21 @@ The last point is the honest engineering finding: a general en_US dictionary
 gives a technical repository ~100% false positives on its first run, so the
 allowlist is not a nicety — it is the mechanism that makes the tool usable at
 all.
+
+## `examples/ci-gate`
+
+A demonstration that the contract above actually gates a build. `bash
+examples/ci-gate/run.sh` writes a five-word dictionary from scratch (**offline, nothing
+vendored**) and asserts five cases — clean tree → `0`, one typo → `1`, one typo with
+`--no-fail` → `0`, missing dictionary → `2`, no arguments → `2` — then prints the workflow
+snippet. It exits non-zero if any case misbehaves, so CI can run it; this repository's own
+CI does.
+
+Why a third example instead of a paragraph: the project's application form promised a tool
+whose "exit status can be embedded in a pipeline to intercept spelling errors
+automatically". A promise in prose is not a demonstration. See
+[`ci-gate/README.md`](ci-gate/README.md) for the copy-paste workflow, the pre-commit
+variant, and the two things to know before wiring it up.
 
 ## Adding another example
 

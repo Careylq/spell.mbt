@@ -17,6 +17,7 @@ moonbit
 mooncakes
 moonrun
 mbt
+doccheck
 wasm
 llvm
 toolchain
@@ -128,5 +129,6 @@ artefact
 derivational
 misaligns
 misclassifies
+misconfiguration
 normalisation
 tokenizers
