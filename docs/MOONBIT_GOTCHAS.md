@@ -426,6 +426,72 @@ printf 'hello\nzzzz\n' | moon run cmd/main -- check --aff a.aff --dic d.dic --wo
 - **同族**：`trim()` / `trim_start()` / `trim_end()` 返回的也是 `StringView`，
   直接 `has_prefix` / `has_suffix` 没问题，但要当 `String` 传递就得 `.to_owned()`。
 
+## 42. 🔵 `String::to_array()` 每次调用都新分配一个数组——不要在循环里调用
+
+> 本条是**运行时/测量**验证的（编译器不会报），与 #33 同类。
+
+- **症状**：一个正确性完全没问题的实现，吞吐只有应有水平的一半。
+  `apply_conversion` 里保持了「**每个输入位置**都重新解析一遍 pattern」的写法：
+  ```moonbit
+  while position < chars.length() {
+    for entry in table {
+      let (pattern_text, at_end) = conversion_pattern(entry.from)  // 每位置重算
+      let pattern = pattern_text.to_array()                        // 每位置新分配
+      ...
+    }
+  }
+  ```
+  `conversion_pattern` 是纯函数、`table` 在循环内不变，所以这是标准的循环不变量，
+  但它**每次都会新分配** `Array[Char]`。en_US 有 `ICONV 1`，于是每检查一个词都要
+  分配「词长 × 规则数」个数组。
+- **正确写法**：把不变量提到循环外，只做一次：
+  ```moonbit
+  let patterns : Array[(Array[Char], String, Bool)] = []
+  for entry in table {
+    let (pattern_text, at_end) = conversion_pattern(entry.from)
+    if pattern_text.is_empty() { continue }
+    patterns.push((pattern_text.to_array(), entry.to, at_end))   // 只分配一次
+  }
+  ```
+- **实测（A/B，同一台机器、同一命令、9 次中位数）**：`en_US` 自带的 49,568 个词
+  全部直接命中时，**0.746 µs/词 → 0.403 µs/词（1.85×）**；再加上下面 #43 的
+  改动后到 **0.323 µs/词（相对基线 2.31×）**。这个差异**编译器、测试、符合率
+  全都发现不了**——只有对真实词典计时才会暴露。
+- **同族**：
+  - `StringBuilder` 在循环里分配同样致命：构造一次、`reset()` 复用（见 #36）。
+  - 任何 `to_array()` / `to_owned()` / `.to_string()` 出现在 `while` 体内，
+    先问一句「它依赖循环变量吗」。不依赖就提出去。
+
+## 43. 🔵 「必要条件」的检查要用零分配写法，别先构造再判断
+
+> 同上，**运行时/测量**验证。
+
+- **症状**：`check_word_group` 在**每个词**上都先干这些事，然后才发现根本用不上：
+  ```moonbit
+  fn Dictionary::check_word_group(self, word) -> Bool {
+    let parts : Array[String] = []      // 分配 1
+    let buffer = StringBuilder()        // 分配 2
+    for c in word { ... buffer.write_char(c) ... }   // 把整词复制一遍
+    parts.push(buffer.to_string())      // 分配 3，又是一份新 String
+    if parts.length() < 2 { return false }           // ← 到这里才知道是白干
+    ...
+  }
+  ```
+  它由 `check` 在**真正的查表之前**无条件调用，而绝大多数输入就是「一行一个词」
+  （没有空格），所以三次分配是纯粹的白付。
+- **正确写法**：先用一个**不分配**的扫描判掉必要条件：
+  ```moonbit
+  fn has_whitespace(word : String) -> Bool {
+    for c in word { if c.is_whitespace() { return true } }
+    false
+  }
+  ```
+  注意它只是**必要条件**：`"  drink  "` 含空白却仍然不是一个词组，所以为真时
+  必须继续走原来的完整逻辑。名字要如实反映这一点，不要叫 `has_word_group`。
+- **实测（A/B）**：49,568 个直接命中词 **0.403 µs/词 → 0.323 µs/词**。
+- **同族**：`for c in word` 这种遍历是**不分配**的，可以放心做前置扫描；
+  决定要不要付分配成本，要用这一步的结果，而不是先付了再说。
+
 ---
 
 ## 附二：实现过程中被测试抓出来的两个真 bug（值得记住）

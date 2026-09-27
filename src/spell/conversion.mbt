@@ -87,8 +87,40 @@ fn prepare_conversions(
 /// is never rescanned. A pair whose pattern is empty is skipped: a bare `_`
 /// would be an anchor with nothing to match. An empty table (the common case)
 /// returns `text` unchanged.
+/// The patterns are split and turned into code points ONCE, before the scan, so
+/// the inner loop only compares. Doing that per input position re-split every
+/// pattern and allocated an array for every character of every word, which is
+/// what `prepare_conversions` says the per-word cost must not do.
 fn apply_conversion(table : Array[@aff.Conversion], text : String) -> String {
   if table.is_empty() || text.is_empty() {
+    return text
+  }
+  let patterns : Array[(Array[Char], String, Bool)] = []
+  let first_chars : Array[Char] = []
+  for entry in table {
+    let (pattern_text, at_end) = conversion_pattern(entry.from)
+    if pattern_text.is_empty() {
+      continue
+    }
+    let pattern = pattern_text.to_array()
+    first_chars.push(pattern[0])
+    patterns.push((pattern, entry.to, at_end))
+  }
+  if patterns.is_empty() {
+    return text
+  }
+  // Most words in most languages contain none of the characters any conversion
+  // pattern starts with (en_US converts a single typographic apostrophe). That
+  // scan is allocation-free, so it is worth one pass to avoid building a code
+  // point array and a string buffer for a text that cannot change.
+  let mut may_match = false
+  for c in text {
+    if first_chars.contains(c) {
+      may_match = true
+      break
+    }
+  }
+  if !may_match {
     return text
   }
   let chars = text.to_array()
@@ -96,12 +128,8 @@ fn apply_conversion(table : Array[@aff.Conversion], text : String) -> String {
   let mut position = 0
   while position < chars.length() {
     let mut matched = false
-    for entry in table {
-      let (pattern_text, at_end) = conversion_pattern(entry.from)
-      if pattern_text.is_empty() {
-        continue
-      }
-      let pattern = pattern_text.to_array()
+    for entry in patterns {
+      let (pattern, replacement, at_end) = entry
       if position + pattern.length() > chars.length() {
         continue
       }
@@ -111,7 +139,7 @@ fn apply_conversion(table : Array[@aff.Conversion], text : String) -> String {
       if at_end && position + pattern.length() != chars.length() {
         continue
       }
-      buffer.write_string(entry.to)
+      buffer.write_string(replacement)
       position = position + pattern.length()
       matched = true
       break

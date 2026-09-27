@@ -40,11 +40,31 @@ pub fn Dictionary::check(self : Dictionary, word : String) -> Bool {
 }
 
 ///|
+/// Whether `word` contains any whitespace at all.
+///
+/// This is only the necessary condition for a word group, not the definition: a
+/// line of nothing but spaces has whitespace and is still not a group. It exists
+/// so `check_word_group` can reject the overwhelmingly common single-word case —
+/// the CLI checks one word per line — before allocating a parts array, a buffer
+/// and a copy of the word.
+fn has_whitespace(word : String) -> Bool {
+  for c in word {
+    if c.is_whitespace() {
+      return true
+    }
+  }
+  false
+}
+
+///|
 /// Hunspell also accepts a line of whitespace-separated words when every one of
 /// them is correct on its own (`drink eat` is correct because `drink` and `eat`
 /// are). A line with fewer than two words is not this path, so `check` falls
 /// through to the normal single-word judgement.
 fn Dictionary::check_word_group(self : Dictionary, word : String) -> Bool {
+  if !has_whitespace(word) {
+    return false
+  }
   let parts : Array[String] = []
   let buffer = StringBuilder()
   let mut pending = false

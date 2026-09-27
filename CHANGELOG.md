@@ -4,6 +4,65 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
+## [0.9.1] — 2026-09-27
+
+Measurement correction, two performance fixes, and tests for a previously untested
+function. **No spelling judgement changed** — confirmed by the full suite, the full
+conformance corpus and the differential test (below).
+
+### Fixed
+- **`conformance/run.sh` scored space-containing corpus lines as failures.** It paired the
+  input and verdict streams positionally with `paste -d' '`, which silently misaligns any
+  line that contains a space (`morph.good` has 16, e.g. `drink eat`) and scored them as
+  failures whatever the engine said. It now emits one verdict per non-empty input line and
+  **counts** them, and still prints the historical positional totals so the two stay
+  comparable. Corrected result: `.good` **825/848 (97.3%) → 841/848 (99.2%)**. The 16-verdict
+  difference is the measurement artefact, not a behaviour change. `.wrong` 611/613 (99.7%)
+  and `.sug` 141/173 (81.5%) were already counted correctly and are unchanged.
+- **`apply_conversion` re-parsed every pattern at every input position.** The patterns were
+  split and turned into code points *inside* the per-character loop, so checking one word
+  allocated "word length × pattern count" arrays — even though `prepare_conversions`' own
+  doc comment promises "a linear scan without re-parsing the patterns". The patterns are now
+  prepared once per call, plus an allocation-free pre-scan that returns the text unchanged
+  when no pattern can start anywhere in it.
+- **`check_word_group` allocated three times per word to reject the common case.** It built a
+  parts array, a `StringBuilder` and then a copy of the word, only to discover there was a
+  single part. It now rejects "contains no whitespace at all" first, with an allocation-free
+  scan (`has_whitespace`).
+
+### Performance
+A/B on the same machine, same command, medians of 9 runs, on the dictionary's own 49,568
+`en_US` entries (all direct hits): **0.746 µs/word → 0.323 µs/word (2.31×)**; all-miss words
+9.81 → 9.28 µs/word. The direct-hit path is now at parity with native `hunspell 1.7.3`
+(0.38 vs 0.36 µs/word, 1.06×, inside run-to-run variance). The synthetic scaling curve
+improves on hits from 0.36–0.42 to 0.24–0.28 µs/word. Neither problem was visible to the
+compiler or to the test suite — only to timing a real dictionary.
+
+### Added
+- `conformance/differential.sh` — differential test against the real `hunspell` binary over a
+  whole word list, printing every disagreement in both directions. On
+  `/usr/share/dict/words` (235,976 words, `en_US`): **198 false accepts (0.084%)**, **1 false
+  reject** (`Jean-Christophe`), 199 total (0.084%). Re-running the same measurement in a
+  `git worktree` at the commit before the compound work gives an identical 198/1, so that
+  work introduced no regression. It is deliberately **not** wired into CI: it needs a system
+  `hunspell` and reports rather than gates.
+- **10 whitebox tests for `apply_conversion`**, which had **none** despite implementing
+  `ICONV`/`OCONV`. They pin the longest-then-anchored ordering, the end-of-word `_` anchor,
+  the empty-pattern skip, the "output is never rescanned" rule, code-point (not byte)
+  matching, and the no-match fast path. Tests 166 → 176 (wasm/wasm-gc/js), 170 → 180 (native).
+- `docs/MOONBIT_GOTCHAS.md` entries **#42** and **#43**, both explicitly marked as
+  runtime/measurement-verified: loop-invariant `to_array()` allocation, and using an
+  allocation-free check for a necessary condition instead of building the object first.
+
+### Verification
+The two performance changes touch `ICONV`/`OCONV` and word-group handling, so they were
+confirmed three independent ways: the whole suite (176/176 on wasm, wasm-gc and js;
+180/180 native), the full conformance corpus (identical `841/848`, `611/613`) and the
+differential test (identical 198/1). The new tests were also **mutation-checked** — making
+the fast path inspect only the first character fails 5 of them. The hunspell `iconv`,
+`iconv2`, `iconv3`, `oconv`, `oconv2` and `iconv_break_overflow` suites pass 100%
+(6/6, 4/4, 1/1, 2/2 + 3/3, 1/1, 1/1).
+
 ## [0.9.0] — 2026-09-27
 
 Final closeout. No behaviour change; `.good` 825/848 (97.3%), `.wrong` 611/613 (99.7%) and

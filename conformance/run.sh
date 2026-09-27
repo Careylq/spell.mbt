@@ -96,10 +96,35 @@ printf -- '---------------------------------------------------------------------
 
 total_good_pass=0; total_good=0
 total_wrong_pass=0; total_wrong=0
+# Positional (historical) figures, see the note under the totals.
+total_good_pass_pos=0
+total_wrong_pass_pos=0
+mismatched=0
 suites=0
 
 run_words() {   # $1=aff $2=dic $3=words-file  -> prints one 1/0 per input line
   moon run cmd/main -- check --aff "$1" --dic "$2" --words - < "$3" 2>/dev/null
+}
+
+# The CLI emits exactly one verdict per NON-EMPTY input line, in input order, so the
+# verdicts can simply be counted -- no positional pairing is needed. The older
+# implementation paired the two streams with `paste -d' '`, which silently
+# misaligns whenever a corpus line contains a space (e.g. morph.good's "drink eat"
+# lines), so those lines were scored as failures no matter what the engine said.
+# The positional figure is still computed and reported for comparability.
+score() {       # $1=words-file $2=expected-verdict(1|0) $3=actual-output  -> pass count
+  local in_lines out_lines pass
+  in_lines=$(grep -c . "$1" || true)
+  out_lines=$(printf '%s\n' "$3" | grep -c . || true)
+  if [ "$in_lines" = "$out_lines" ]; then
+    pass=$(printf '%s\n' "$3" | grep -c "^$2\$" || true)
+  else
+    echo "  ! $(basename "${1%.*}")"": $out_lines verdicts for $in_lines input lines" >&2
+    mismatched=$((mismatched + 1))
+    pass=$(paste -d' ' <(grep . "$1") <(printf '%s\n' "$3") 2>/dev/null \
+           | awk -v e="$2" '$2==e' | wc -l | tr -d ' ')
+  fi
+  printf '%s' "${pass:-0}"
 }
 
 for aff in $(find "$TESTS" -name '*.aff' | sort); do
@@ -110,24 +135,28 @@ for aff in $(find "$TESTS" -name '*.aff' | sort); do
   good="$base.good"; wrong="$base.wrong"
   [ -f "$good" ] || [ -f "$wrong" ] || continue
 
-  g_pass=0; g_tot=0
-  w_pass=0; w_tot=0
+  g_pass=0; g_tot=0; g_pass_pos=0
+  w_pass=0; w_tot=0; w_pass_pos=0
 
   if [ -f "$good" ]; then
     got="$(run_words "$aff" "$dic" "$good")"
     g_tot=$(grep -c . "$good" || true)
-    g_pass=$(paste -d' ' <(grep . "$good") <(printf '%s\n' "$got") 2>/dev/null | awk '$2==1' | wc -l | tr -d ' ')
+    g_pass=$(score "$good" 1 "$got")
+    g_pass_pos=$(paste -d' ' <(grep . "$good") <(printf '%s\n' "$got") 2>/dev/null | awk '$2==1' | wc -l | tr -d ' ')
   fi
 
   if [ -f "$wrong" ]; then
     got="$(run_words "$aff" "$dic" "$wrong")"
     w_tot=$(grep -c . "$wrong" || true)
-    w_pass=$(paste -d' ' <(grep . "$wrong") <(printf '%s\n' "$got") 2>/dev/null | awk '$2==0' | wc -l | tr -d ' ')
+    w_pass=$(score "$wrong" 0 "$got")
+    w_pass_pos=$(paste -d' ' <(grep . "$wrong") <(printf '%s\n' "$got") 2>/dev/null | awk '$2==0' | wc -l | tr -d ' ')
   fi
 
   suites=$((suites + 1))
   total_good_pass=$((total_good_pass + g_pass));  total_good=$((total_good + g_tot))
   total_wrong_pass=$((total_wrong_pass + w_pass)); total_wrong=$((total_wrong + w_tot))
+  total_good_pass_pos=$((total_good_pass_pos + g_pass_pos))
+  total_wrong_pass_pos=$((total_wrong_pass_pos + w_pass_pos))
 
   printf '%-34s %-16s %-16s\n' \
     "$(basename "$base")" \
@@ -143,5 +172,22 @@ pct() { [ "$2" -eq 0 ] && echo "n/a" || awk "BEGIN{printf \"%.1f%%\", 100*$1/$2}
 echo
 echo "good  pass rate: $(pct "$total_good_pass" "$total_good")"
 echo "wrong pass rate: $(pct "$total_wrong_pass" "$total_wrong")"
+echo
+echo "Counted per verdict (the figures above). One verdict is emitted per non-empty"
+echo "input line, in order, so counting is exact even for corpus lines containing a"
+echo "space (morph.good has 16 of them)."
+echo
+echo "For comparability with earlier runs, the historical POSITIONAL figures were:"
+echo "  good  ${total_good_pass_pos}/${total_good}  ($(pct "$total_good_pass_pos" "$total_good"))"
+echo "  wrong ${total_wrong_pass_pos}/${total_wrong}  ($(pct "$total_wrong_pass_pos" "$total_wrong"))"
+echo "Those paired the two streams with 'paste -d\" \"', which silently misaligns any"
+echo "line containing a space, so such lines were always scored as failures. The gap"
+echo "between the two figures is the size of that measurement artefact, not a"
+echo "behaviour difference."
+if [ "$mismatched" -gt 0 ]; then
+  echo
+  echo "WARNING: $mismatched suite(s) emitted a different number of verdicts than input"
+  echo "lines; those fell back to the positional comparison. See the messages above." >&2
+fi
 echo
 echo "Copy these numbers into the Conformance table in README.mbt.md — do not estimate them."

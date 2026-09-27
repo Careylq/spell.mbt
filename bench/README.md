@@ -265,7 +265,7 @@ test corpus, and it is why the benchmark needs the network for sections 1–3.
 
 ## Results
 
-One real run, `bash bench/run.sh`, **2026-09-22T06:13:14Z**.
+One real run, `bash bench/run.sh`, **2026-09-27T07:35:54Z**.
 
 Machine / toolchain (printed by the script itself):
 
@@ -288,18 +288,24 @@ Command shape: `moon run cmd/main -- check --aff en_US.aff --dic en_US.dic --wor
 
 | step | wasm debug (`moon run`) | wasm release (`moon run --release`) |
 |---|---|---|
-| process start (no-arg run) | 0.0190 s | 0.0190 s |
-| start + load (empty word list) | 0.1330 s | 0.1090 s |
-| **load only** (derived) | **0.1140 s** | **0.0900 s** |
-| 1-word run (2-point cross-check) | 0.1340 s | 0.1090 s |
-| 49,568-word run, all hits | 0.1870 s | 0.1530 s |
-| **checking only** (derived) | **0.0540 s** | **0.0440 s** |
-| per-word checking cost | 1.09 µs | 0.89 µs |
-| throughput, end-to-end | 265,070 words/s | 323,974 words/s |
-| throughput, checking only | 917,926 words/s | 1,126,545 words/s |
+| process start (no-arg run) | 0.0190 s | 0.0210 s |
+| start + load (empty word list) | 0.1390 s | 0.1120 s |
+| **load only** (derived) | **0.1200 s** | **0.0910 s** |
+| 1-word run (2-point cross-check) | 0.1400 s | 0.1150 s |
+| 49,568-word run, all hits | 0.2020 s | 0.1980 s |
+| **checking only** (derived) | **0.0630 s** | **0.0860 s** |
+| per-word checking cost | 1.27 µs | 1.73 µs |
+| throughput, end-to-end | 245,386 words/s | 250,343 words/s |
+| throughput, checking only | 786,794 words/s | 576,372 words/s |
 
-2-point cross-check: debug `0.1150 s` vs `0.1140 s`; release `0.0900 s` vs
-`0.0900 s`.
+2-point cross-check: debug `0.1210 s` vs `0.1200 s`; release `0.0940 s` vs
+`0.0910 s`.
+
+The two end-to-end totals are within 1.5% of each other (0.2020 s vs 0.1980 s), so
+the split of that total into "load" and "checking" is dominated by run-to-run noise
+in the empty-word-list point it is derived from. The release column loading faster
+(0.0910 s vs 0.1200 s) while appearing to check slower is an artefact of that
+subtraction, not a real effect.
 
 Self-check: **49,565/49,568** entries accepted; the 3 rejected (`1th 2th 3th`)
 all carry the `.aff` `ONLYINCOMPOUND` flag `c`, i.e. the rejection is correct and
@@ -310,18 +316,18 @@ is *derived* from the dictionary rather than hard-coded.
 | metric | ours native | hunspell | ratio (ours/theirs) |
 |---|---|---|---|
 | process start | 0.0020 s | 0.0030 s | 0.67× |
-| start + load | 0.0300 s | 0.0100 s | 3.00× |
-| load only | 0.0280 s | 0.0070 s | 4.00× |
-| 49,568 **hits**: total | 0.0470 s | 0.0290 s | 1.62× |
-| 49,568 hits: checking only | 0.0170 s | 0.0190 s | **0.89×** |
-| 49,568 hits: per word | 0.34 µs | 0.38 µs | 0.89× |
-| 49,568 hits: throughput (e2e) | 1,054,638 w/s | 1,709,241 w/s | |
-| 49,568 **misses**: total | 0.4720 s | 0.0870 s | 5.43× |
-| 49,568 misses: checking only | 0.4420 s | 0.0770 s | 5.74× |
-| 49,568 misses: per word | 8.92 µs | 1.55 µs | 5.75× |
-| 49,568 misses: throughput (e2e) | 105,017 w/s | 569,747 w/s | |
-| 235,976 mixed words: total | 1.7300 s | 0.2950 s | 5.86× |
-| 235,976 mixed words: throughput | 136,402 w/s | 799,919 w/s | |
+| start + load | 0.0320 s | 0.0100 s | 3.20× |
+| load only | 0.0300 s | 0.0070 s | 4.29× |
+| 49,568 **hits**: total | 0.0510 s | 0.0280 s | 1.82× |
+| 49,568 hits: checking only | 0.0190 s | 0.0180 s | 1.06× |
+| 49,568 hits: per word | 0.38 µs | 0.36 µs | 1.06× |
+| 49,568 hits: throughput (e2e) | 971,922 w/s | 1,770,286 w/s | |
+| 49,568 **misses**: total | 0.5080 s | 0.0840 s | 6.05× |
+| 49,568 misses: checking only | 0.4760 s | 0.0740 s | 6.43× |
+| 49,568 misses: per word | 9.60 µs | 1.49 µs | 6.44× |
+| 49,568 misses: throughput (e2e) | 97,575 w/s | 590,095 w/s | |
+| 235,976 mixed words: total | 1.9100 s | 0.2870 s | 6.66× |
+| 235,976 mixed words: throughput | 123,548 w/s | 822,216 w/s | |
 
 `/usr/share/dict/words` (235,976 words) is **18.4% hits** (43,474 accepted) on
 this dictionary, so it is miss-dominated.
@@ -330,11 +336,11 @@ this dictionary, so it is miss-dominated.
 49,568 words into an all-hit and an all-miss list (verified: 0 of the "+xq"
 misses were accepted) shows:
 
-* on the **hit** path the two engines are essentially level — our checking phase
-  is 0.34 µs/word vs hunspell's 0.38 µs/word (0.89×). Our 1.62× end-to-end gap
-  on that list is almost entirely **dictionary load** (28 ms vs 7 ms, 4.0×), not
-  lookup;
-* on the **miss** path we are 5.8× slower per word (8.92 µs vs 1.55 µs), because
+* on the **hit** path the two engines are level — our checking phase is
+  0.38 µs/word vs hunspell's 0.36 µs/word (1.06×, a gap inside run-to-run
+  variance). Our 1.82× end-to-end gap on that list is almost entirely
+  **dictionary load** (30 ms vs 7 ms, 4.29×), not lookup;
+* on the **miss** path we are 6.4× slower per word (9.60 µs vs 1.49 µs), because
   `affix_hit` (`src/spell/lookup.mbt`) tries every suffix rule, every prefix
   rule, the prefix×suffix cross product and the two-suffix families for every
   rejected word, while a hit ends at `direct_hit` — one map access.
@@ -347,30 +353,30 @@ scaling curve tests.
 
 | backend | total | throughput |
 |---|---|---|
-| native release | 1.7300 s | 136,402 words/s |
-| wasm release (`moon run --release`) | 3.8370 s | 61,500 words/s |
-| wasm debug (plain `moon run`) | 4.3530 s | 54,210 words/s |
+| native release | 1.9100 s | 123,548 words/s |
+| wasm release (`moon run --release`) | 4.2010 s | 56,171 words/s |
+| wasm debug (plain `moon run`) | 4.7820 s | 49,347 words/s |
 
-Native release is **2.22×** faster than release wasm and **2.52×** faster than
+Native release is **2.20×** faster than release wasm and **2.50×** faster than
 debug wasm on this miss-dominated workload.
 
 ### 4. Scaling curve (synthetic; 100,000-word workload at every size)
 
 | entries | .dic KiB | rules | load ms | hit µs/w | miss µs/w | hit e2e w/s | miss e2e w/s |
 |---|---|---|---|---|---|---|---|
-| 1,000 | 17.6 | 8 | 1.00 | 0.36 | 0.90 | 2,564,103 | 1,075,269 |
-| 10,000 | 181.6 | 8 | 7.00 | 0.38 | 0.95 | 2,127,660 | 961,538 |
-| 50,000 | 940.4 | 8 | 35.00 | 0.39 | 0.99 | 1,315,789 | 735,294 |
-| 200,000 | 3,817.6 | 8 | 144.00 | 0.42 | 1.00 | 531,915 | 406,504 |
+| 1,000 | 17.6 | 8 | 1.00 | 0.24 | 0.81 | 3,703,704 | 1,190,476 |
+| 10,000 | 181.6 | 8 | 7.00 | 0.26 | 0.85 | 2,857,143 | 1,063,830 |
+| 50,000 | 940.4 | 8 | 35.00 | 0.30 | 0.88 | 1,492,537 | 800,000 |
+| 200,000 | 3,817.6 | 8 | 144.00 | 0.28 | 0.94 | 574,713 | 416,667 |
 
 * **Load scales linearly** with the entry count: 1.0 → 7.0 → 35 → 144 ms, i.e.
   ≈0.7 µs per entry, and the `.dic` size grows linearly too.
 * **Per-word checking does not scale with dictionary size.** Over a 200× range,
-  the hit path moves 0.36 → 0.42 µs/word and the miss path 0.90 → 1.00 µs/word.
+  the hit path moves only 0.24 → 0.28 µs/word and the miss path 0.81 → 0.94 µs/word.
   The small upward drift is consistent with cache pressure; the point is that
   neither curve follows the 200× growth of the dictionary.
 * The **e2e words/s columns fall** purely because they include the load: at
-  200,000 entries, 144 ms of the ~190 ms hit run is load and index building.
+  200,000 entries, 144 ms of the ~174 ms hit run is load and index building.
   That is why the µs/word columns, not the words/s columns, are the scaling
   evidence.
 
@@ -378,12 +384,12 @@ debug wasm on this miss-dominated workload.
 
 | target | artifact | bytes |
 |---|---|---|
-| wasm | `_build/wasm/release/build/cmd/main/main.wasm` | 105,042 (102.6 KiB) |
-| wasm-gc | `_build/wasm-gc/release/build/cmd/main/main.wasm` | 80,326 |
-| js | `_build/js/release/build/cmd/main/main.js` | 321,075 |
-| native | `_build/native/release/build/cmd/main/main.exe` | 605,304 |
+| wasm | `_build/wasm/release/build/cmd/main/main.wasm` | 145,655 (142.2 KiB) |
+| wasm-gc | `_build/wasm-gc/release/build/cmd/main/main.wasm` | 113,333 |
+| js | `_build/js/release/build/cmd/main/main.js` | 469,140 |
+| native | `_build/native/release/build/cmd/main/main.exe` | 761,128 |
 
-The wasm CLI is ~103 KiB with no C++ runtime — that is the payload a wasm host
+The wasm CLI is ~142 KiB with no C++ runtime — that is the payload a wasm host
 downloads.
 
 ### 6. Correctness cross-check against hunspell (bonus, cheap)

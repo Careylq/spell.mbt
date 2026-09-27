@@ -29,6 +29,11 @@ MoonBit 拼写检查库。**本项目未复制 Hunspell 的源代码。**
 
 示例中使用的词典均标注其来源与许可证，见 `examples/` 与各词典目录下的说明。
 
+`bench/run.sh`、`conformance/differential.sh` 与 `examples/doccheck` 都会在**运行时**
+把 `en_US`（LibreOffice `dictionaries` 项目，源自 SCOWL）拉取到**临时目录**，
+用完即删，**不写进本仓库**。SCOWL / Kevin Atkinson 的许可与部分来源的 Ispell BSD
+与 WordNet 声明见上游的 `README_en_US.txt`。
+
 ## 第三方依赖
 
 见 `moon.mod` 的 `import` 段与 `moon tree` 输出。

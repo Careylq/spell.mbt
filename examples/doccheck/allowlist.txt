@@ -119,5 +119,14 @@ macOS
 jsDelivr
 
 # --- ordinary English words a size-60 SCOWL list omits -------------------
+# `artefact` and `normalisation` are the British spellings used by this
+# project's prose; the dictionary is en_US, which does not carry them.
+# `misaligns` and `derivational` are ordinary derivational forms that the
+# size-60 SCOWL list omits (the same class of gap the differential test
+# measures: 198 words on /usr/share/dict/words).
+artefact
+derivational
+misaligns
 misclassifies
+normalisation
 tokenizers

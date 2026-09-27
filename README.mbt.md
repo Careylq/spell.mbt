@@ -11,7 +11,7 @@ for the words it rejects.
 > code block below is verified by `moon check`. `README.md` is a symlink to this file
 > so that GitHub renders it.
 
-> **Status: 0.9.0.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
+> **Status: 0.9.1.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
 > judgement engine, the suggestion engine, the public API and the `check` /
 > `suggest` CLI subcommands are implemented and tested on all four backends. See
 > [Not implemented yet](#not-implemented-yet) for what suggestion generation
@@ -27,7 +27,7 @@ actual run of the harness, not an estimate.
 
 | Metric | Passing | Total | Pass rate |
 |---|---|---|---|
-| `.good` (must be accepted) | 825 | 848 | 97.3% |
+| `.good` (must be accepted) | 841 | 848 | 99.2% |
 | `.wrong` (must be rejected) | 611 | 613 | 99.7% |
 | `.sug` (expected best suggestion produced) | 141 | 173 | 81.5% |
 
@@ -65,24 +65,46 @@ is nothing to implement it from without guessing (see
 [Not implemented yet](#not-implemented-yet)). These conformance numbers were
 re-measured after that parser change and are unchanged.
 
-The remaining `.good` gap is now 23 words, and 16 of those are the harness
-measurement artifact described below (`morph.good`). The genuinely missing seven come
-from casing idioms the manual does not spell out: matching an ALL-CAPS input against a
-mixed-case dictionary form such as `OpenOffice.org` or `iPod` (`allcaps`, `allcaps_utf`,
-`allcaps2`, 6 words), the Hungarian "moving rule" for a `COMPOUNDFORBIDFLAG` stem
-(`hu`, 1 word), and the word-count typo check the `limit-multiple-compounding` corpus
-expects for three-part compounds (1 word). The `.wrong` column is now 611/613 = 99.7%:
-only `limit-multiple-compounding`'s `foobarbaz` and one `allcaps2` word are wrongly
-accepted. Run `bash conformance/run.sh` locally to reproduce.
+The remaining `.good` gap is exactly **7 verdicts**, all of them casing idioms the
+`hunspell(5)` manual records only as flags and never as an algorithm: matching an
+ALL-CAPS input against a mixed-case dictionary form such as `OpenOffice.org` or
+`iPod` (`allcaps`, `allcaps_utf` and `allcaps2` — 6 verdicts over 4 distinct
+spellings: `OPENOFFICE.ORG`, `UNICEF'S`, `L'AFRIQUE`, `IPOD`) and the Hungarian
+"moving rule" for a `COMPOUNDFORBIDFLAG` stem (`hu`, 1 word:
+`forróvíz-tartály`). The `.wrong` column is 611/613 = 99.7%: only `allcaps2`'s
+`iPodos` and `limit-multiple-compounding`'s `foobarbaz` are wrongly accepted. Run
+`bash conformance/run.sh` locally to reproduce — it prints every failing suite.
 
-> Measurement caveat: the harness pairs each `.good` line with the verdict of the
-> matching input line using `paste -d' '`, so a corpus line that itself contains a
-> space is misaligned. `morph.good` has 16 such lines (`drink eat`, …); the
-> library accepts all of them (they are checked as whitespace-separated groups,
-> and each word in the group is correct), but the harness can only report 10 of
-> the 26 `morph.good` lines. That is a limitation of the measurement, not of the
-> library, and the harness was deliberately left untouched so the numbers stay
-> comparable.
+> Measurement note: the harness emits exactly one verdict per non-empty input line
+> and **counts** those verdicts, so a corpus line that itself contains a space is
+> now scored correctly. Earlier runs paired the two streams positionally with
+> `paste -d' '`, which silently misaligned every line containing a space —
+> `morph.good` has 16 of them (`drink eat`, …) — and scored them as failures
+> whatever the engine said. `conformance/run.sh` counts verdicts and *also* prints
+> the historical positional totals (`825/848`, `611/613`) next to the counted ones
+> so the two stay comparable; the 16-verdict difference between `825` and `841` is
+> the size of that measurement artefact, not a behaviour change. Tab-terminated
+> lines such as `utf8_bom.good`'s are unaffected either way, because `awk` splits
+> on tabs as well as spaces.
+
+### Differential test against the real hunspell
+
+The corpus above is hand-written cases. `bash conformance/differential.sh` is the
+complementary measurement — a whole real word list judged by both engines, with
+every disagreement printed:
+
+| on `/usr/share/dict/words` (235,976 words, `en_US`) | count | share |
+|---|---|---|
+| we accept, hunspell rejects (**false accepts**) | 198 | 0.084% |
+| we reject, hunspell accepts (**false rejects**) | 1 | 0.000% |
+| total disagreement | 199 | 0.084% |
+
+The single false reject is `Jean-Christophe`. The 198 false accepts are forms
+Hunspell reaches through derivational rules this library does not cover yet
+(`-er` / `-ing` / `-ness` / `-ly` coinages). They are **not** a regression: the same
+measurement re-run in a `git worktree` at the commit before the compound work gives
+an identical 198/1 — zero new, zero fixed. `run.sh` and `differential.sh` both
+report; neither treats a disagreement as a harness failure.
 
 ## Performance
 
@@ -115,19 +137,22 @@ repetitions; `load = empty − start`, `check = N-words − empty`.
 
 | step | wasm debug (`moon run`) | wasm release (`moon run --release`) |
 |---|---|---|
-| process start | 0.0190 s | 0.0190 s |
-| start + load (49,568 entries) | 0.1330 s | 0.1090 s |
-| **load only** | **0.1140 s** | **0.0900 s** |
-| 49,568-word run (all hits) | 0.1870 s | 0.1530 s |
-| **checking only** | **0.0540 s** | **0.0440 s** |
-| per-word check | 1.09 µs | 0.89 µs |
-| throughput, end-to-end | 265,070 words/s | 323,974 words/s |
-| throughput, checking only | 917,926 words/s | 1,126,545 words/s |
+| process start | 0.0190 s | 0.0210 s |
+| start + load (49,568 entries) | 0.1390 s | 0.1120 s |
+| **load only** | **0.1200 s** | **0.0910 s** |
+| 49,568-word run (all hits) | 0.2020 s | 0.1980 s |
+| **checking only** | **0.0630 s** | **0.0860 s** |
+| per-word check | 1.27 µs | 1.73 µs |
+| throughput, end-to-end | 245,386 words/s | 250,343 words/s |
+| throughput, checking only | 786,794 words/s | 576,372 words/s |
 
 Plain `moon run` compiles **debug** wasm; the release column is the same backend
-compiled like the native binary, and its 0.153 s is the "≈0.15 s to load the
-dictionary and judge its own 49,568 entries" figure recorded earlier in this
-project. All 49,568 entries load; 49,565 are accepted standalone and the 3
+compiled like the native binary. The two end-to-end totals are within 1.5% of each
+other (0.2020 s vs 0.1980 s), so the split of that total between "load" and
+"checking" is dominated by run-to-run noise in the empty-word-list point the split
+is derived from — the release column loading faster (0.0910 s vs 0.1200 s) while
+appearing to check slower is an artefact of that subtraction, not a real effect.
+All 49,568 entries load; 49,565 are accepted standalone and the 3
 rejected (`1th`, `2th`, `3th`) all carry `ONLYINCOMPOUND`, which Hunspell also
 rejects standalone — the harness derives that from the `.aff` instead of
 hard-coding it.
@@ -142,29 +167,30 @@ not apples-to-apples, so this compares **two native executables** on the same
 | workload | ours native | hunspell | ratio |
 |---|---|---|---|
 | process start | 0.0020 s | 0.0030 s | 0.67× |
-| dictionary load only | 0.0280 s | 0.0070 s | 4.00× |
-| 49,568 all-hit words: total | 0.0470 s | 0.0290 s | 1.62× |
-| 49,568 all-hit words: **checking only** | 0.0170 s | 0.0190 s | **0.89×** |
-| 49,568 all-hit words: **per word** | **0.34 µs** | **0.38 µs** | 0.89× |
-| 49,568 all-miss words: total | 0.4720 s | 0.0870 s | 5.43× |
-| 49,568 all-miss words: checking only | 0.4420 s | 0.0770 s | 5.74× |
-| 49,568 all-miss words: per word | 8.92 µs | 1.55 µs | 5.75× |
-| 235,976 mixed words (`/usr/share/dict/words`, 18.4% hits) | 1.7300 s | 0.2950 s | 5.86× |
-| 235,976 mixed words: throughput | 136,402 words/s | 799,919 words/s | |
+| dictionary load only | 0.0300 s | 0.0070 s | 4.29× |
+| 49,568 all-hit words: total | 0.0510 s | 0.0280 s | 1.82× |
+| 49,568 all-hit words: **checking only** | **0.0190 s** | **0.0180 s** | 1.06× |
+| 49,568 all-hit words: **per word** | **0.38 µs** | **0.36 µs** | 1.06× |
+| 49,568 all-miss words: total | 0.5080 s | 0.0840 s | 6.05× |
+| 49,568 all-miss words: checking only | 0.4760 s | 0.0740 s | 6.43× |
+| 49,568 all-miss words: per word | 9.60 µs | 1.49 µs | 6.44× |
+| 235,976 mixed words (`/usr/share/dict/words`, 18.4% hits) | 1.9100 s | 0.2870 s | 6.66× |
+| 235,976 mixed words: throughput | 123,548 words/s | 822,216 words/s | |
 
 The aggregate ratios hide the interesting part. On **hits** the two engines are
-level per word (0.34 µs vs 0.38 µs) — our 1.62× there is almost entirely
-dictionary load (28 ms vs 7 ms) — while on **misses** we are 5.8× slower per
+level per word (0.38 µs vs 0.36 µs, a 6% gap that is inside run-to-run variance) —
+our 1.82× on that row is almost entirely dictionary load (30 ms vs 7 ms) — while on
+**misses** we are 6.4× slower per
 word, because a rejected word runs the reverse affix lookup over every suffix
 rule, every prefix rule, the prefix×suffix cross product and the two-suffix
 families (`affix_hit` in `src/spell/lookup.mbt`), whereas a hit is one map
 access (`direct_hit`). Real text is miss-dominated here: `/usr/share/dict/words`
 is only 18.4% hits. **The miss path and dictionary load are the optimisation
-targets; direct lookup is already competitive.**
+targets; direct lookup is already at parity.**
 
-As a cross-backend data point on the same 235,976 words: native release 1.730 s
-is **2.22×** faster than release wasm (3.837 s) and **2.52×** faster than the
-debug wasm that plain `moon run` builds (4.353 s).
+As a cross-backend data point on the same 235,976 words: native release 1.910 s
+is **2.20×** faster than release wasm (4.201 s) and **2.50×** faster than the
+debug wasm that plain `moon run` builds (4.782 s).
 
 ### Scaling on synthetic dictionaries
 
@@ -175,14 +201,14 @@ generator is verified byte-reproducible during the run.
 
 | entries | .dic KiB | load | hit | miss | hit end-to-end | miss end-to-end |
 |---|---|---|---|---|---|---|
-| 1,000 | 17.6 | 1.00 ms | 0.36 µs/word | 0.90 µs/word | 2,564,103 w/s | 1,075,269 w/s |
-| 10,000 | 181.6 | 7.00 ms | 0.38 µs/word | 0.95 µs/word | 2,127,660 w/s | 961,538 w/s |
-| 50,000 | 940.4 | 35.00 ms | 0.39 µs/word | 0.99 µs/word | 1,315,789 w/s | 735,294 w/s |
-| 200,000 | 3,817.6 | 144.00 ms | 0.42 µs/word | 1.00 µs/word | 531,915 w/s | 406,504 w/s |
+| 1,000 | 17.6 | 1.00 ms | 0.24 µs/word | 0.81 µs/word | 3,703,704 w/s | 1,190,476 w/s |
+| 10,000 | 181.6 | 7.00 ms | 0.26 µs/word | 0.85 µs/word | 2,857,143 w/s | 1,063,830 w/s |
+| 50,000 | 940.4 | 35.00 ms | 0.30 µs/word | 0.88 µs/word | 1,492,537 w/s | 800,000 w/s |
+| 200,000 | 3,817.6 | 144.00 ms | 0.28 µs/word | 0.94 µs/word | 574,713 w/s | 416,667 w/s |
 
 Load grows linearly (≈0.7 µs per entry), but **per-word checking does not follow
-the dictionary size**: across a 200× range the hit path moves 0.36 → 0.42 µs and
-the miss path 0.90 → 1.00 µs. The end-to-end words/s columns fall only because
+the dictionary size**: across a 200× range the hit path moves only 0.24 → 0.28 µs
+and the miss path 0.81 → 0.94 µs. The end-to-end words/s columns fall only because
 they include the load. (The synthetic affix set has 8 rules against real
 `en_US`'s 50, so synthetic miss *absolute* values are not comparable with the
 table above; the trend is the result.)
@@ -191,12 +217,12 @@ table above; the trend is the result.)
 
 | target | bytes |
 |---|---|
-| wasm (`cmd/main`) | 105,042 (102.6 KiB) |
-| wasm-gc | 80,326 |
-| js | 321,075 |
-| native | 605,304 |
+| wasm (`cmd/main`) | 145,655 (142.2 KiB) |
+| wasm-gc | 113,333 |
+| js | 469,140 |
+| native | 761,128 |
 
-The wasm CLI is ~103 KiB with no C++ runtime — that is the payload a wasm host
+The wasm CLI is ~142 KiB with no C++ runtime — that is the payload a wasm host
 downloads and runs.
 
 ### What is *not* measured
@@ -250,10 +276,10 @@ fetched at run time and never vendored):
 
 | run | words checked | misspelled tokens | distinct words |
 |---|---|---|---|
-| first run, no allowlist | 16,602 | 461 | 110 |
-| with `examples/doccheck/allowlist.txt` | 16,602 | 0 | 0 |
+| first run, no allowlist | 17,998 | 515 | 114 |
+| with `examples/doccheck/allowlist.txt` | 17,998 | 0 | 0 |
 
-**Of the 110 distinct words the first run flagged, 0 were real typos and 110 were false
+**Of the 114 distinct words the first run flagged, 0 were real typos and 114 were false
 positives.** They are project vocabulary (`wasm`, `backend`, `aff`), Hunspell
 terminology (`Fuge`, `endchars`, `ngram`), MoonBit and third-party proper nouns
 (`MoonBit`, `macOS`, `jsDelivr`), British spellings (`judgement`, `licence`, `modelled`)
@@ -493,7 +519,8 @@ each of wasm, wasm-gc, js and native.
 - **ALL-CAPS input against a mixed-case dictionary form** — Hunspell matches
   `OPENOFFICE.ORG` to `OpenOffice.org`, `UNICEF'S` to `UNICEF's` and `IPOD` to `iPod`.
   The library only folds an ALL-CAPS word to its lowercase and capitalised spellings, so
-  those three (`allcaps`, `allcaps_utf`, `allcaps2`, 7 words) are still lost, and one
+  those (`allcaps`, `allcaps_utf`, `allcaps2` — 6 verdicts over 4 distinct spellings)
+  are still lost, and one
   `allcaps2` forbidden word (`iPodos`) is consequently accepted. The `hunspell(5)` manual
   documents the *flags* (`KEEPCASE`, `CHECKSHARPS`) but not the casing algorithm itself.
 - **The Hungarian "moving rule"** — `LANG hu` activates a hard-wired rule that lets a

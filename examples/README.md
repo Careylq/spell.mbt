@@ -108,12 +108,12 @@ is not clean, and the numbers below are from actual runs, not estimates.
 
 | run | files | words checked | misspelled tokens | distinct words |
 |---|---|---|---|---|
-| first run, no allowlist | 32 | 16,602 | 461 | 110 |
-| after `allowlist.txt` (101 entries) | 32 | 16,602 | **0** | **0** |
-| `--include-tests` (allowlist on) | 46 | 18,042 | 14 | 11 |
+| first run, no allowlist | 32 | 17,998 | 515 | 114 |
+| after `allowlist.txt` (105 entries) | 32 | 17,998 | **0** | **0** |
+| `--include-tests` (allowlist on) | 46 | 19,595 | 14 | 11 |
 
-All 110 distinct words the first run flagged were reviewed by hand: **none was a
-typo.** 110 of 110 were false positives of a general dictionary on a technical
+All 114 distinct words the first run flagged were reviewed by hand: **none was a
+typo.** 114 of 114 were false positives of a general dictionary on a technical
 repository — project vocabulary (`wasm`, `stdin`, `backend`, `aff`, `dic`), the
 Hunspell/affix terminology this project is about (`Fuge`, `endchars`,
 `circumfix`, `ngram`, `checksharps`), MoonBit and third-party proper nouns
