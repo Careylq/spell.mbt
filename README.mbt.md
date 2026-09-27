@@ -7,9 +7,9 @@ format** — it parses real-world dictionaries (e.g. `en_US`), applies the affix
 defined in the `.aff` file, judges words the way Hunspell does, and suggests corrections
 for the words it rejects.
 
-> This file is `README.mbt.md` — MoonBit type-checks `.mbt.md` files, so any MoonBit
-> code block below is verified by `moon check`. `README.md` is a symlink to this file
-> so that GitHub renders it.
+> This file is `README.mbt.md` — MoonBit type-checks `.mbt.md` files, so every block
+> below marked `mbt check` is compiled by `moon check` (an unmarked block is not).
+> `README.md` is a symlink to this file so that GitHub renders it.
 
 > **Status: 0.9.1.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
 > judgement engine, the suggestion engine, the public API and the `check` /
@@ -302,6 +302,25 @@ usable, not a formality. The full rules, the `--include-tests` numbers
 moon add Careylq/spell
 ```
 
+`moon add` only records the dependency in `moon.mod`. The package that **uses** the
+library must also import it in its own `moon.pkg`:
+
+```text
+import {
+  "Careylq/spell",
+}
+```
+
+A blackbox test file (`*_test.mbt`) is a separate scope, so declare the import for it
+with `for "test"`. Without that, `moon check --deny-warn` fails with
+`unused_package` even though the tests pass:
+
+```text
+import {
+  "Careylq/spell",
+} for "test"
+```
+
 ## Quick start
 
 Load a dictionary once, then judge as many words as you like. The module root
@@ -318,8 +337,23 @@ test {
 }
 ```
 
-`load` raises `SpellError` when either text is malformed; when reading files, prefer
-`moon run cmd/main` (below), which reports the failing file and line on stderr.
+`load` raises `SpellError` when either text is malformed, so handle it where you load —
+the same `catch` works inside an ordinary `main`:
+
+```mbt check
+///|
+test {
+  let dictionary = @spell.load("SET UTF-8", "1\ncat") catch {
+    error => abort("could not load the dictionary: \{error.to_string()}")
+  }
+  assert_true(@spell.check(dictionary, "cat"))
+}
+```
+
+Alternatively declare the entry point as `fn main raise` and let the error propagate.
+[`examples/basic`](examples/basic/main.mbt) is the runnable version of both patterns.
+When reading dictionaries from files, prefer `moon run cmd/main` (below), which reports
+the failing file and line on stderr.
 
 Once a word is judged wrong, `suggest` returns the corrections `check` itself accepts,
 best first:
@@ -338,6 +372,10 @@ test {
 ```
 
 ### Command line
+
+`cmd/main` is this module's own executable package, so these commands run from inside
+a clone of this repository. A project that depends on the library cannot `moon run` it
+by path.
 
 ```bash
 moon run cmd/main -- check --aff en_US.aff --dic en_US.dic --words -
@@ -613,6 +651,23 @@ moon test       # run tests
 moon fmt        # format
 moon info       # regenerate .mbti interfaces
 ```
+
+## Community articles
+
+- **《AI 写了 7300 行 MoonBit：编译器能验的，和验不了的》** — how this library was built
+  with an AI assistant, and the part that matters more: the three verification layers,
+  and why a 2.31× performance regression *and* a 1.9-point conformance understatement
+  both survived a green `moon check`, a green test suite and an unchanged conformance
+  number. The fix in both cases was re-measuring, not adding features.
+  - 知乎 — https://zhuanlan.zhihu.com/p/2087606024068976886
+  - 掘金 — https://juejin.cn/post/7689644399769796649
+
+  (Chinese. Every measured number in it was taken from this repository, but one has
+  moved since publication: the article and the cover say **178 / 182** tests and the
+  repository now has **179 / 183**, because the `mbt check` block added to the Quick start
+  above contains a `test` and is therefore executed by `moon test`. Where the article and
+  this repository ever disagree, this file and the scripts that produce it win — which is
+  the article's own point.)
 
 ## License
 

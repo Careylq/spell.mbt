@@ -1,18 +1,25 @@
 # 验收自检表（ACCEPTANCE）
 
-依据《2026 9月 MoonBit 黑客松大赛章程》阶段三「项目验收」要求，逐条自检。
+依据《2026 9月 MoonBit 黑客松大赛章程》自检。章程里有**两份**清单，本文件两份都对照：
+
+- **阶段三「项目验收」**：**9 条**。第 9 条含两个子句（OSI 许可证 / 参考移植合规），
+  所以下表的 10 行是 9 条要求 + 第 9 条拆成两行的逐条自检，**不是**有第 10 条要求。
+- **第七章「开源与成果提交要求」**：**10 条**，见本文末尾。
+
 **提交完成支持申请前必须全部勾选。**
+
+## 一、阶段三「项目验收」（9 条 → 10 行）
 
 | # | 章程要求 | 状态 | 证据位置 |
 |---|---|---|---|
 | 1 | 项目以 **MoonBit 为主要实现语言** | ✅ | 全仓库 `.mbt` 源码；纯 MoonBit，零 FFI，无其它语言实现核心逻辑 |
-| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；commit 历史连续、有意义（36 个） |
+| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；commit 历史连续、有意义（37 个） |
 | 3 | 源代码结构清晰，**能完成声明的核心功能** | ✅ | `src/aff`（.aff 解析）`src/dic`（.dic 解析）`src/affix`（条件匹配）`src/spell`（判定引擎）`src/suggest`（建议引擎）`src/api`（公开 API）`cmd/main`（CLI） |
 | 4 | 提供 **README**：项目目标 / 安装方式 / 使用方法 / 示例 / **可复现** | ✅ | `README.mbt.md`（`README.md` 为其符号链接）；含 Quick start、CLI 用法、可复现步骤 |
 | 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | `.github/workflows/ci.yml` → `moon check` / `moon build` / `moon test` + 跨后端构建 + 符合率报告 |
 | 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ | `examples/basic`（`moon run examples/basic` 可直接运行）；另有 `examples/doccheck` 用本库检查本仓库自己的文档，并以退出码（0 干净 / 1 有拼写错误 / 2 用法或 I/O 错误）支持 CI 门禁 |
-| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **178 个测试**（native **182 个**），四个后端全部通过；另有符合率框架 `conformance/` |
-| 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.9.3`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
+| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **179 个测试**（native **183 个**），四个后端全部通过；另有符合率框架 `conformance/` |
+| 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.9.4`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
 | 9 | 采用 **OSI 认可的开源许可证** | ✅ | `LICENSE` = Apache-2.0 |
 | 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | `NOTICE`：参考 Hunspell（LGPL-2.1）的**格式规范与可观察行为**，未复制源码；测试语料与词典均不随仓库分发 |
 
@@ -86,6 +93,26 @@ n-gram 权重、归一化、阈值、`MAXNGRAMSUGS` 默认值、何为「差」�
 - [x] `NOTICE` 里的参考范围与许可证声明准确
 - [x] `DEVLOG.md` 已补齐到最新（Day 1–11）
 - [ ] 申报书承诺的功能**全部实现**；未实现的已在 README「已知限制」中明确标注 —— **需对照本人提交的申报书原文逐条确认**
+
+## 二、第七章「开源与成果提交要求」（10 条）
+
+| # | 章程要求 | 状态 | 证据位置 |
+|---|---|---|---|
+| 1 | 项目须在 GitHub 或赛事组认可的平台**公开发布** | ✅ | https://github.com/Careylq/spell.mbt （public）；并发布到 mooncakes.io |
+| 2 | 仓库须包含**完整源代码** | ✅ | `src/`（6 个库包）+ `cmd/main` + `examples/`；全部为源码，无生成物入库 |
+| 3 | 仓库须保留**合理开发历史记录** | ✅ | 37 次提交，按功能分组；`DEVLOG.md` 逐日记录；`.githooks/pre-commit` |
+| 4 | 仓库须包含 **README** | ✅ | `README.mbt.md`（`README.md` 为符号链接） |
+| 5 | 项目须选择 **OSI 认证许可证** | ✅ | Apache-2.0（OSI 认证） |
+| 6 | 如移植或参考其他开源项目，应在 **README 或专门文档**中注明原项目**名称、链接、许可证和参考范围** | ✅ | `NOTICE`（专门文档）：Hunspell、链接、LGPL-2.1、参考范围逐项列明；README 也指向它 |
+| 7 | 项目须遵守**第三方依赖及参考项目的许可证**要求 | ✅ | 依赖仅 `moonbitlang/x`（纯 MoonBit）；Hunspell 仅参考格式规范未复制源码；语料与词典运行时拉取、不随仓库分发 |
+| 8 | 不得侵犯他人知识产权，不得提交**未经授权的私有/闭源/商业代码** | ✅ | 全部实现为本期从零编写；无任何来源不明代码 |
+| 9 | 如包含**生成代码、测试数据或样例文件**，应保证其**来源合法合规** | ✅ | 样例词典在 `examples/basic` 中现写并注明来源；`examples/doccheck/allowlist.txt` 为本项目自产；AI 辅助的开发范围与验证方式逐日记在 `DEVLOG.md`，并有 `docs/MOONBIT_GOTCHAS.md`（43 条）与已发表文章作为可核验的过程记录 |
+| 10 | 同意主办方在保留署名前提下用于**赛事宣传、官网展示、社区文章、技术分享** | ✅ | 已知悉并同意（章程第九条与此条为参赛前提） |
+
+> 第 9 条与本项目尤其相关：开发过程使用了 AI 辅助，因此**代码来源可核验**是关键。
+> 可核验的材料是现成的：`DEVLOG.md`（逐日的设计取舍与"哪些由 AI 生成、如何验证"）、
+> `docs/MOONBIT_GOTCHAS.md`（43 条由编译器/运行时验证的坑）、
+> `CHANGELOG.md`（每个版本的改动与理由），以及已发表在知乎/掘金的技术文章。
 
 ## 明确未实现（须在 README 中列出）
 

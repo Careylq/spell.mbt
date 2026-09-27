@@ -4,7 +4,42 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
-## [0.9.3] — 2026-09-27
+## [0.9.4] — 2026-09-27
+
+Documentation only. No code, test or interface change.
+
+### Fixed
+- **The README's first five minutes were broken.** Verified by building a real consumer
+  project (`moon new` → `moon add Careylq/spell` → copy the README) and hitting the
+  failures one by one:
+  - `moon add` only writes `moon.mod`; the README never mentioned `moon.pkg`, so copying
+    the Quick start failed with `Package "spell" not found in the loaded packages`. The
+    required `moon.pkg` snippet is now shown.
+  - A blackbox test file needs the import declared `for "test"`; without it
+    `moon check --deny-warn` fails with `unused_package` even though the tests pass.
+    Now shown next to the other snippet.
+  - `load` raises, so it cannot be called from a plain `fn main` (error 4122). The README
+    now shows the `catch` form as a checked block and mentions `fn main raise`;
+    `examples/basic` was already the runnable version.
+  - The CLI section did not say that `moon run cmd/main` only works inside a clone of this
+    repository — from a dependent project the path does not resolve.
+- The self-verification note at the top claimed "any MoonBit code block below is verified
+  by `moon check`". Only blocks tagged `mbt check` are compiled (confirmed by mutating
+  one and watching `moon check` fail, then mutating an unmarked block and watching it
+  pass). The note now says what is actually true.
+
+### Changed
+- Tests 178 → **179** (wasm, wasm-gc, js) and 182 → **183** (native). Not a new test file:
+  the `mbt check` block added to the README's Quick start contains a `test`, and `moon test`
+  executes it. The README's documented behaviour is now enforced by the suite instead of
+  merely compiled.
+
+### Added
+- **Community articles**: the published 知乎 and 掘金 write-ups are now linked from the
+  README, with the note that where the article and this repository disagree, the
+  repository and the scripts that produce it win.
+
+
 
 Documentation only. No code, test or interface change.
 
