@@ -276,12 +276,14 @@ without parsing the output (`0` clean, `1` misspellings found, `2` usage/I-O err
 `--no-fail` forces `0` for callers that only want the numbers).
 
 Measured on this repository (`moon 0.1.20260920`, en_US from LibreOffice/SCOWL size 60,
-fetched at run time and never vendored):
+fetched at run time and never vendored). The word count depends on how much prose the
+repository carries, so these figures are a **snapshot of the 0.9.2 tree**; re-running the
+command prints the current numbers:
 
 | run | words checked | misspelled tokens | distinct words |
 |---|---|---|---|
-| first run, no allowlist | 17,998 | 515 | 114 |
-| with `examples/doccheck/allowlist.txt` | 17,998 | 0 | 0 |
+| first run, no allowlist | 18,334 | 525 | 114 |
+| with `examples/doccheck/allowlist.txt` | 18,334 | 0 | 0 |
 
 **Of the 114 distinct words the first run flagged, 0 were real typos and 114 were false
 positives.** They are project vocabulary (`wasm`, `backend`, `aff`), Hunspell

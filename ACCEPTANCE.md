@@ -6,13 +6,13 @@
 | # | 章程要求 | 状态 | 证据位置 |
 |---|---|---|---|
 | 1 | 项目以 **MoonBit 为主要实现语言** | ✅ | 全仓库 `.mbt` 源码；纯 MoonBit，零 FFI，无其它语言实现核心逻辑 |
-| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；commit 历史连续、有意义（34 个） |
+| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；commit 历史连续、有意义（35 个） |
 | 3 | 源代码结构清晰，**能完成声明的核心功能** | ✅ | `src/aff`（.aff 解析）`src/dic`（.dic 解析）`src/affix`（条件匹配）`src/spell`（判定引擎）`src/suggest`（建议引擎）`src/api`（公开 API）`cmd/main`（CLI） |
 | 4 | 提供 **README**：项目目标 / 安装方式 / 使用方法 / 示例 / **可复现** | ✅ | `README.mbt.md`（`README.md` 为其符号链接）；含 Quick start、CLI 用法、可复现步骤 |
 | 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | `.github/workflows/ci.yml` → `moon check` / `moon build` / `moon test` + 跨后端构建 + 符合率报告 |
 | 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ | `examples/basic`（`moon run examples/basic` 可直接运行）；另有 `examples/doccheck` 用本库检查本仓库自己的文档，并以退出码（0 干净 / 1 有拼写错误 / 2 用法或 I/O 错误）支持 CI 门禁 |
 | 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **178 个测试**（native **182 个**），四个后端全部通过；另有符合率框架 `conformance/` |
-| 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.9.2`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
+| 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.9.3`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
 | 9 | 采用 **OSI 认可的开源许可证** | ✅ | `LICENSE` = Apache-2.0 |
 | 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | `NOTICE`：参考 Hunspell（LGPL-2.1）的**格式规范与可观察行为**，未复制源码；测试语料与词典均不随仓库分发 |
 

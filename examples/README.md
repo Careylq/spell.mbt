@@ -106,11 +106,14 @@ is not clean, and the numbers below are from actual runs, not estimates.
 
 ### Measured on this repository (moon 0.1.20260920, en_US SCOWL size 60)
 
+The word count grows with the repository's own prose, so these are a **snapshot of the
+0.9.2 tree**; re-running the command prints the current figures.
+
 | run | files | words checked | misspelled tokens | distinct words |
 |---|---|---|---|---|
-| first run, no allowlist | 32 | 17,998 | 515 | 114 |
-| after `allowlist.txt` (105 entries) | 32 | 17,998 | **0** | **0** |
-| `--include-tests` (allowlist on) | 46 | 19,595 | 14 | 11 |
+| first run, no allowlist | 32 | 18,334 | 525 | 114 |
+| after `allowlist.txt` (105 entries) | 32 | 18,334 | **0** | **0** |
+| `--include-tests` (allowlist on) | 46 | 19,974 | 14 | 11 |
 
 All 114 distinct words the first run flagged were reviewed by hand: **none was a
 typo.** 114 of 114 were false positives of a general dictionary on a technical

@@ -4,7 +4,18 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
-## [0.9.2] — 2026-09-27
+## [0.9.3] — 2026-09-27
+
+Documentation only. No code, test or interface change.
+
+### Fixed
+- The `doccheck` figures quoted in README.mbt.md and examples/README.md were measured
+  before 0.9.2's own prose was added, so they had gone stale — the same class of mistake
+  this release series has been removing. They are now the **0.9.2 tree** snapshot and are
+  labeled as such, because the word count necessarily grows with the repository's own
+  prose and would otherwise be invalidated by every future edit.
+
+
 
 Makes the dogfooding example's exit code usable as a CI gate. Library code is
 untouched, so conformance and benchmark numbers cannot change and were not re-run.
