@@ -111,6 +111,7 @@ neighbour
 neighbours
 neighbouring
 behavioural
+memoisation
 organised
 organisers
 honoured

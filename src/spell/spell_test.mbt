@@ -671,7 +671,10 @@ test "numbers with separators are accepted when the separators sit between digit
   assert_true(dictionary.check("1234567.123456"))
   assert_true(dictionary.check("4,2"))
   assert_true(dictionary.check("42-42"))
-  // at most one separator, and never adjacent or at an end
+  // any number of separators, but never adjacent and never at an end
+  assert_true(dictionary.check("1.2.3"))
+  assert_true(dictionary.check("1.2.3.4"))
+  assert_true(dictionary.check("2026.1.1"))
   assert_false(dictionary.check("1..2"))
   assert_false(dictionary.check("1,,2"))
   assert_false(dictionary.check("1.,2"))
@@ -680,7 +683,6 @@ test "numbers with separators are accepted when the separators sit between digit
   // a break, unlike `-1`, which the default `^-` break strips)
   assert_false(dictionary.check(",1"))
   assert_false(dictionary.check("1,"))
-  assert_false(dictionary.check("1.2.3"))
   assert_false(dictionary.check("1a"))
   assert_true(dictionary.check("foo"))
 }
@@ -1226,4 +1228,50 @@ test "ICONV honours the end-of-word marker" {
   assert_true(d.check("ax"))
   assert_false(d.check("xa"))
   assert_false(d.check("axx"))
+}
+
+///|
+test "the compound part ceiling is 8, a disclosed deviation from the manual" {
+  // `hunspell(5)` says an absent `COMPOUNDWORDMAX` is *unlimited*; this library stops at
+  // `compound_part_ceiling()` parts instead, because the backtracking search is
+  // exponential without a bound. That is recorded in README "Not implemented yet" and
+  // `ACCEPTANCE.md` 7.2 -- this test pins the *documented* behaviour so that raising the
+  // ceiling is a deliberate act with a measurement behind it, not a silent change.
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 1
+  let dic =
+    #|1
+    #|a/C
+  let dictionary = load(aff, dic)
+  assert_true(dictionary.check("aaaaaaaa"))
+  assert_false(dictionary.check("aaaaaaaaa"))
+  assert_false(dictionary.check("aaaaaaaaaaaa"))
+  // An explicit limit is passed through, so the directive's parameter path works.
+  let limited = load(aff + "\nCOMPOUNDWORDMAX 2", dic)
+  assert_false(limited.check("aaaaaaaaa"))
+  let generous = load(aff + "\nCOMPOUNDWORDMAX 12", dic)
+  assert_true(generous.check("aaaaaaaaaaaa"))
+}
+
+///|
+test "CHECKCOMPOUNDTRIPLE is ASCII-only, like the reference implementation" {
+  // `hunspell(5)` documents the reference as ASCII-only -- "Bug: missing multi-byte
+  // character support in UTF-8 encoding (works only for 7-bit ASCII characters)" -- so
+  // a non-ASCII triple is ACCEPTED there and must be accepted here too.
+  let aff =
+    #|SET UTF-8
+    #|COMPOUNDFLAG C
+    #|COMPOUNDMIN 2
+    #|CHECKCOMPOUNDTRIPLE
+  // `abb` + `bcd` meets at a triple `b`, so it is forbidden; `abc` + `def` is the
+  // control that a compound with no triple is still accepted.
+  let ascii = load(aff, "4\nabb/C\nbcd/C\nabc/C\ndef/C")
+  assert_false(ascii.check("abbbcd"))
+  assert_true(ascii.check("abcdef"))
+  // The same shape with `é` instead of `b`: the reference accepts it because its check
+  // is ASCII-only, so this library accepts it too.
+  let utf8 = load(aff, "2\nabéé/C\nécd/C")
+  assert_true(utf8.check("abééécd"))
 }

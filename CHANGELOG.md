@@ -118,6 +118,64 @@ Tests: 182 → **200** (wasm/wasm-gc/js), 186 → **204** (native).
   `examples/ci-gate/run.sh`, a phase-2 (report-only) step — which is how a parser wart
   survives.
 
+### Fixed — three audit findings, each closed with a mutation-tested test
+
+A follow-up to the audit above: of the six behavioural deviations it found, three are fixed
+here and one was attempted and **reverted after measurement** (the compound-length bullet
+below records the measurement that killed it, because it is the useful part). Every one was re-checked against `hunspell 1.7.3` on the same synthetic dictionary
+after the change, and every new assertion was mutation-tested (break the code, confirm the
+test goes red). Issues #1, #3 and #4 track them; this commit closes those three and leaves
+#2 open.
+
+- **Multi-separator numbers were rejected** (`1.2.3`, `1.2.3.4`, `2026.1.1`) — version
+  numbers and dates, i.e. exactly what a prose checker meets. `is_number_word` allowed a
+  single separator while its own comment stated Hunspell's rule correctly ("separators ...
+  not adjacent and sit between digits"). Rewritten around one "previous character was a
+  separator" flag, seeded `true` so a leading separator needs no special case.
+  **The test was part of the defect**: `spell_test.mbt` asserted `check("1.2.3") == false`,
+  so the assertion — not the implementation — was what had to change, and the new cases
+  were added beside it. This is `AGENTS.md` rule 4 applied rather than quoted.
+- **A compound could not have more than 8 parts — attempted, and reverted on measurement.**
+  `hunspell(5)` says of `COMPOUNDWORDMAX`: "Default is unlimited." The default branch and the
+  `COMPOUNDSYLLABLE` exception both fall back to a hard-coded 8, so compounds of nine or more
+  parts are rejected. Raising the ceiling to the word's own length is the obvious fix and it
+  makes the backtracking search exponential: upstream's `tests/timelimit` suite is one
+  22-character word over `WORDCHARS 01` + `COMPOUNDMIN 1` + `COMPOUNDFLAG Y`, and with the
+  higher ceiling **that single word ran past 20 s here against 7 ms for `hunspell 1.7.3`** —
+  the conformance run hung and had to be stopped. The reference implementation survives the
+  same input only with a hard-coded wall-clock `TIMELIMIT_MS` that `hunspell(5)` never
+  documents and that would make verdicts machine-dependent. The ceiling therefore stays at 8,
+  now named `compound_part_ceiling()` with the reason and the measurement in its comment, and
+  issue #2 stays open: closing it needs a search budget or memoisation, not a bigger number.
+  An explicit `COMPOUNDWORDMAX` still moves the ceiling, and a test pins both directions.
+- **The compound search does not stop at the first decomposition** — noticed while measuring
+  the above and left to the same follow-up: with the ceiling back at 8, that 22-character word
+  still takes ~3.1 s, so the search enumerates every decomposition of a word that is already
+  known to decompose (`1` + twenty-one `0`s).
+- **`CHECKCOMPOUNDTRIPLE` applied to non-ASCII characters.** Both this code's comment and
+  `hunspell(5)` say ASCII-only; the manual records it as a limitation of the reference
+  implementation ("Bug: missing multi-byte character support in UTF-8 encoding (works only
+  for 7-bit ASCII characters)"). Matching the reference is this project's purpose, so the
+  code now matches it: `abééécd` is accepted, as Hunspell accepts it, while the ASCII case
+  `abbbcd` is still rejected.
+- **The CLI's `is_valid_utf8` accepted overlong encodings and surrogates** while its own doc
+  comment claimed it rejected them. The function decides whether a word list is decoded as
+  UTF-8 or as the legacy encoding the `.aff` declares (`SET ISO8859-1` is common in the
+  corpus), so accepting byte sequences UTF-8 cannot represent can flip verdicts. Added the
+  `E0`/`ED` and `F0`/`F4` second-byte range checks. It had **no test at all**, because the
+  CLI was outside `moon test` entirely.
+- **`spell --help` did not exist.** `spell check --help` answered "--help needs a value" and
+  `spell --help` answered "unknown subcommand" — the first two things a new user types, on a
+  repository whose README tells you to run the CLI. `--help` and `-h` are now recognised in
+  option position, exit `0`, and print to **stdout** so the output can be piped; error paths
+  keep printing to stderr and exiting `2`. The usage text is built once and read by both
+  printers, so the two cannot drift, and `examples/ci-gate/run.sh` now asserts the CLI's exit
+  statuses — they had no gate before, which is how this survived.
+- The three remaining audit findings stay disclosed in README's "Not implemented yet" and
+  `ACCEPTANCE.md` 7.2: **`PHONE` digit priorities** and **`AM` aliases** (neither can change an
+  observable verdict, so changing their data structures would be risk without behaviour), and
+  the **compound part ceiling** above, which needs a search budget rather than a bigger number.
+
 ## [0.9.6] — 2026-09-27
 
 Documentation, repository hygiene and CI. No library code or interface change.

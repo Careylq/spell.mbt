@@ -71,13 +71,26 @@ fn run(args : Array[String]) -> Int {
     print_usage()
     return 2
   }
+  // `spell --help` / `spell -h`: asking for help is not an error.
+  if args[1] == "--help" || args[1] == "-h" {
+    print_help()
+    return 0
+  }
   if args[1] == "suggest" {
+    if wants_help(args) {
+      print_help()
+      return 0
+    }
     return run_suggest(args)
   }
   if args[1] != "check" {
     eprintln("spell: unknown subcommand \"\{args[1]}\"")
     print_usage()
     return 2
+  }
+  if wants_help(args) {
+    print_help()
+    return 0
   }
   let options = match parse_options(args) {
     Ok(options) => options
@@ -523,9 +536,15 @@ fn decode_words(bytes : Bytes, encoding : FileEncoding) -> String {
 }
 
 ///|
-/// Strictly validate UTF-8 (overlong forms, stray continuation bytes and
-/// truncated sequences all count as invalid), so the fallback above only
-/// triggers when the input really is not UTF-8.
+/// Strictly validate UTF-8, so the fallback above only triggers when the input really
+/// is not UTF-8.
+///
+/// "Strictly" is the whole point of this function: it decides whether a word list is
+/// decoded as UTF-8 or as the legacy encoding the `.aff` file declares (`SET
+/// ISO8859-1` is common in the corpus), so a sequence that UTF-8 cannot represent must
+/// not be accepted as UTF-8. Rejected: stray continuation bytes, truncated sequences,
+/// **overlong forms**, **surrogates** and anything above U+10FFFF. The overlong and
+/// surrogate cases used to pass, while this comment claimed they did not.
 fn is_valid_utf8(bytes : Bytes) -> Bool {
   let length = bytes.length()
   let mut index = 0
@@ -544,12 +563,23 @@ fn is_valid_utf8(bytes : Bytes) -> Bool {
         !is_continuation(bytes[index + 2]) {
         return false
       }
+      // `E0 80..9F` encodes a code point below U+0800 (an overlong form), and
+      // `ED A0..BF` encodes a surrogate, which UTF-8 may not carry at all.
+      let second = bytes[index + 1].to_int()
+      if (first == 0xE0 && second < 0xA0) || (first == 0xED && second >= 0xA0) {
+        return false
+      }
       index = index + 3
     } else if first >= 0xF0 && first <= 0xF4 {
       if index + 3 >= length ||
         !is_continuation(bytes[index + 1]) ||
         !is_continuation(bytes[index + 2]) ||
         !is_continuation(bytes[index + 3]) {
+        return false
+      }
+      // `F0 80..8F` is overlong, and `F4 90..BF` would exceed U+10FFFF.
+      let second = bytes[index + 1].to_int()
+      if (first == 0xF0 && second < 0x90) || (first == 0xF4 && second > 0x8F) {
         return false
       }
       index = index + 4
@@ -587,15 +617,52 @@ fn load_dictionary(
 }
 
 ///|
-/// Print the accepted command shape to stderr.
-fn print_usage() -> Unit {
-  eprintln(
-    "usage: spell check --aff <file.aff> --dic <file.dic> [--words <file>|-]",
-  )
-  eprintln("  --words -  read one word per line from stdin (the default)")
-  eprintln("  prints one line per input word: 1 = correct, 0 = incorrect")
-  eprintln(
+/// The usage text as lines, so the two printers below cannot drift apart.
+fn usage_lines() -> Array[String] {
+  [
+    "usage: spell check   --aff <file.aff> --dic <file.dic> [--words <file>|-]",
     "usage: spell suggest --aff <file.aff> --dic <file.dic> [--words <file>|-]",
-  )
-  eprintln("  prints one line per input word: its suggestions joined by \", \"")
+    "       spell --help", "", "  check    prints one line per input word: 1 = correct, 0 = incorrect",
+    "  suggest  prints one line per input word: its suggestions joined by \", \"",
+    "  --words -  read one word per line from stdin (the default)",
+  ]
+}
+
+///|
+/// Print the usage text to **stderr**, for an error (exit status 2).
+fn print_usage() -> Unit {
+  for line in usage_lines() {
+    eprintln(line)
+  }
+}
+
+///|
+/// Print the usage text to **stdout**, for an explicit `--help`.
+///
+/// Asking for help is not an error, so this exits `0`, and it writes to stdout so a
+/// caller can pipe it. Before this, `spell check --help` answered "--help needs a
+/// value" and `spell --help` answered "unknown subcommand" -- the first two things a
+/// new user types.
+fn print_help() -> Unit {
+  for line in usage_lines() {
+    println(line)
+  }
+}
+
+///|
+/// Is `--help` (or `-h`) present as an *option* after the subcommand?
+///
+/// Every option this CLI accepts takes exactly one value, so the scan steps two at a
+/// time: an argument that happens to be the value of `--aff` is a value, not a request
+/// for help.
+fn wants_help(args : Array[String]) -> Bool {
+  let mut index = 2
+  while index < args.length() {
+    let arg = args[index]
+    if arg == "--help" || arg == "-h" {
+      return true
+    }
+    index = index + 2
+  }
+  false
 }

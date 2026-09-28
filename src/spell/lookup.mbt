@@ -333,13 +333,17 @@ fn Dictionary::forbidden_derived(self : Dictionary, word : String) -> Bool {
 }
 
 ///|
-/// Is `word` a number written with separators (`1.5`, `4,2`, `42-42`)?
+/// Is `word` a number written with separators (`1.5`, `4,2`, `42-42`, `1.2.3`)?
 ///
-/// `WORDCHARS` declares the characters that may appear inside a word, and
-/// Hunspell accepts a word built from digits and one of the separator
-/// characters `.`, `,` or `-` when the separators are not adjacent and sit
-/// between digits. So `1.12345` and `42-42` are correct while `1..2`, `1.,2`
-/// and `1,.2` are not.
+/// `WORDCHARS` declares the characters that may appear inside a word, and Hunspell
+/// accepts a word built from digits and the separator characters `.`, `,` or `-`
+/// **however many of them there are**, as long as a separator is neither *adjacent to
+/// another separator* nor at either end. So `1.12345`, `42-42` and `1.2.3` are correct
+/// while `1..2`, `1.,2`, `,1` and `1,` are not.
+///
+/// This used to allow a single separator only, which rejected `1.2.3` and `2026.1.1` —
+/// version numbers and dates, i.e. exactly the input a prose checker meets. The comment
+/// above the old code already described the rule; only the implementation was wrong.
 fn Dictionary::is_number_word(self : Dictionary, word : String) -> Bool {
   let chars = word.to_array()
   if chars.length() == 0 {
@@ -349,31 +353,29 @@ fn Dictionary::is_number_word(self : Dictionary, word : String) -> Bool {
   let allows_comma = self.word_chars.contains(",")
   let allows_dash = self.word_chars.contains("-")
   let mut digits = 0
-  let mut separators = 0
-  let mut separator_at = -1
+  // `true` to start with, so a *leading* separator fails the same adjacency test as
+  // `1..2` instead of needing a case of its own.
+  let mut previous_was_separator = true
   let mut index = 0
   while index < chars.length() {
     let c = chars[index]
     if is_digit_char(c) {
       digits = digits + 1
+      previous_was_separator = false
     } else if (c == '.' && allows_dot) ||
       (c == ',' && allows_comma) ||
       (c == '-' && allows_dash) {
-      separators = separators + 1
-      separator_at = index
+      if previous_was_separator {
+        return false
+      }
+      previous_was_separator = true
     } else {
       return false
     }
     index = index + 1
   }
-  if digits == 0 || separators > 1 {
-    return false
-  }
-  if separators == 1 &&
-    (separator_at == 0 || separator_at == chars.length() - 1) {
-    return false
-  }
-  true
+  // A number needs at least one digit and may not end in a separator.
+  digits > 0 && !previous_was_separator
 }
 
 ///|

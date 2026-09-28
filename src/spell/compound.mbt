@@ -902,8 +902,14 @@ fn first_char(text : String) -> Char {
 
 ///|
 /// `CHECKCOMPOUNDTRIPLE`: does the boundary between `left` and `right` join a
-/// run of three or more identical characters? (Only ASCII characters are
-/// checked, exactly as the manual warns.)
+/// run of three or more identical characters?
+///
+/// **ASCII only, deliberately.** `hunspell(5)` documents this as a limitation of the
+/// reference implementation — "Bug: missing multi-byte character support in UTF-8
+/// encoding (works only for 7-bit ASCII characters)" — so Hunspell accepts a non-ASCII
+/// triple such as `abééécd`. This library reproduces that: compatibility with the
+/// reference is the project's goal, and the conformance corpus is what measures it.
+/// The code used to test every character while this comment already claimed ASCII-only.
 fn compound_triple_forbidden(left : String, right : String) -> Bool {
   if left.is_empty() || right.is_empty() {
     return false
@@ -911,6 +917,9 @@ fn compound_triple_forbidden(left : String, right : String) -> Bool {
   let lc = last_char(left)
   let rc = first_char(right)
   if lc != rc {
+    return false
+  }
+  if !lc.is_ascii() {
     return false
   }
   trailing_run(left) + leading_run(right) >= 3
@@ -1128,6 +1137,16 @@ fn Dictionary::affixed_forceucase(
 }
 
 ///|
+/// The most parts this library will consider in one compound.
+///
+/// `hunspell(5)` documents no such limit (`COMPOUNDWORDMAX` defaults to unlimited); see
+/// `Dictionary::compound_part_limit` for why a deterministic ceiling is used anyway, what
+/// it costs, and the measurement that shows why simply raising it does not work.
+fn compound_part_ceiling() -> Int {
+  8
+}
+
+///|
 /// `COMPOUNDWORDMAX` / `COMPOUNDSYLLABLE`: how many parts a compound of this
 /// spelling may have.
 ///
@@ -1135,11 +1154,30 @@ fn Dictionary::affixed_forceucase(
 /// allows *more* words than `COMPOUNDWORDMAX` ("allow more words in a compound,
 /// than COMPOUNDWORDMAX, if syllable count of the compound is 6 or less").
 /// The syllable count is the number of vowels in the whole word.
+///
+/// # Why the ceiling is 8 and not "unlimited"
+///
+/// `hunspell(5)` says of `COMPOUNDWORDMAX`: "Default is unlimited." This library caps a
+/// compound at `compound_part_ceiling()` parts anyway, which is a **known and disclosed
+/// deviation** (README *Not implemented yet*; `ACCEPTANCE.md` 7.2) — and it is deliberate.
+///
+/// The compound search backtracks over every way of splitting the word, so an unbounded
+/// part count makes it exponential. The reference implementation has the same problem and
+/// answers it with a hard-coded wall-clock `TIMELIMIT_MS` in `affixmgr.cxx` — a mechanism
+/// `hunspell(5)` does not document, and one that would make results depend on the machine.
+/// The upstream corpus has a suite for exactly this: `tests/timelimit.{aff,dic,good}` is
+/// one 22-character word over `WORDCHARS 01`, `COMPOUNDMIN 1` and `COMPOUNDFLAG Y`.
+///
+/// **Measured on 2026-09-28**: raising this ceiling to the word's own length makes that
+/// one word take longer than 20 s here, where `hunspell 1.7.3` answers it in 7 ms — the
+/// corpus caught an attempt to "fix" this deviation by making the number bigger. Closing
+/// it properly needs a search budget or memoisation, not a larger ceiling.
 fn Dictionary::compound_part_limit(self : Dictionary, word : String) -> Int {
+  let ceiling = compound_part_ceiling()
   let word_max = if self.compound_word_max > 0 {
     self.compound_word_max
   } else {
-    8
+    ceiling
   }
   if self.compound_syllable_max <= 0 || self.compound_syllable_vowels.is_empty() {
     return word_max
@@ -1152,7 +1190,7 @@ fn Dictionary::compound_part_limit(self : Dictionary, word : String) -> Int {
     }
   }
   if count <= self.compound_syllable_max {
-    8
+    ceiling
   } else {
     word_max
   }

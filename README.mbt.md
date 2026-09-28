@@ -566,11 +566,10 @@ allowlist and the measured numbers.
     text and from the checked word before any comparison (Arabic harakat, right-to-left
     marks);
   * a trailing `.` is accepted for abbreviations when `WORDCHARS` declares `.`, and a
-    number (ASCII or Arabic-Indic digits) with **one** separator (`.`, `,`, `-`) between
-    digits is accepted when `WORDCHARS` declares that separator (`1.12345`, `4,2`,
-    `42-42`). **This is narrower than Hunspell**, which allows any number of separators
-    as long as they are neither adjacent nor at either end (`1.2.3`, `2026.1.1`); this
-    library rejects those. See [Not implemented yet](#not-implemented-yet);
+    number (ASCII or Arabic-Indic digits) is accepted when `WORDCHARS` declares its
+    separators (`.`, `,`, `-`) — **however many separators there are**, as long as none is
+    adjacent to another and none sits at either end (`1.12345`, `4,2`, `42-42`, `1.2.3`,
+    `2026.1.1`, but not `1..2`, `1.,2`, `,1` or `1,`);
   * `BREAK` splitting, recursively: the declared break points, or Hunspell's defaults
     `-`, `^-` and `-$` (`foo-bar-foo-bar`), with `BREAK 0` switching breaking off;
   * a line of whitespace-separated words is correct when every word on it is correct,
@@ -669,26 +668,40 @@ each of wasm, wasm-gc, js and native.
   describe it, so it is not guessed at.
 - **`COMPOUNDROOT` / `SYLLABLENUM`** — collected in `AffFile::unrecognized` rather than
   modelled on the AST, and not applied; no corpus suite exercises them.
-- **Six behavioural deviations found by an independent audit (2026-09-28), disclosed rather
-  than fixed before this snapshot.** The audit compared this library against hunspell 1.7.3
-  on synthetic dictionaries and found places where behaviour differs from the reference
-  *without* being covered by the list above. None of them appears on the official corpus and
-  none is a conformance failure, so changing verified engine code two days before a deadline
-  was judged the larger risk; they are queued instead. [`ACCEPTANCE.md`](ACCEPTANCE.md) §7.2
-  tabulates all six with the command that establishes each. The two worth naming here:
-  - **Multi-separator numbers** — Hunspell accepts `1.2.3` and `2026.1.1` when the
-    separators are neither adjacent nor at either end; this library allows only **one**
-    separator and rejects them. The implementation's own comment states Hunspell's rule
-    correctly, so this is a code bug rather than a design decision — and the test that
-    asserts `1.2.3` is *false* encodes the bug, which is why only an audit surfaced it.
-  - **Compound length** — an absent `COMPOUNDWORDMAX` means *unlimited* in the manual, but
-    the default branch and the `COMPOUNDSYLLABLE` exception both fall back to 8 parts, so
-    9- and 12-part compounds are rejected where Hunspell accepts them.
-  - **`CHECKCOMPOUNDTRIPLE` scope** — applied to non-ASCII characters although the code's
-    own comment says ASCII-only, so a non-ASCII triple at a compound boundary is rejected.
+- **Behavioural deviations found by an independent audit (2026-09-28).** The audit compared
+  this library against hunspell 1.7.3 on synthetic dictionaries and found six places where
+  behaviour differed from the reference *without* being covered by the list above.
+  **Three are fixed as of this commit** — each with a mutation-tested unit test and each
+  re-checked against `hunspell 1.7.3` on the same synthetic dictionary — and one was
+  **attempted and reverted on measurement**:
+  - **Multi-separator numbers** — Hunspell accepts `1.2.3` and `2026.1.1` when the separators
+    are neither adjacent nor at either end; this library allowed only **one** separator.
+    Fixed. The implementation's own comment had always stated the correct rule, and the test
+    that asserted `1.2.3` was *false* **encoded the bug** — so the assertion was turned into
+    `assert_true` rather than weakening the implementation (see `AGENTS.md` rule 4).
+  - **Compound length** — an absent `COMPOUNDWORDMAX` means *unlimited* (`hunspell(5)`:
+    "Default is unlimited."), but the default branch and the `COMPOUNDSYLLABLE` exception
+    both fall back to 8 parts, so compounds of nine or more parts are rejected. **Attempted,
+    measured, reverted.** Raising the ceiling to the word's length makes the backtracking
+    search exponential: upstream's `tests/timelimit` is one 22-character word, and with the
+    higher ceiling it ran past 20 s here against 7 ms for `hunspell 1.7.3`, hanging the
+    conformance run. Hunspell survives the same input only with an undocumented hard-coded
+    wall-clock limit. The ceiling is now a named `compound_part_ceiling()` carrying that
+    measurement; closing this needs a search budget or memoisation, not a bigger number.
+    (While measuring: with the ceiling back at 8, that word still takes ~3.1 s, because the
+    search enumerates every decomposition instead of stopping at the first.)
+  - **`CHECKCOMPOUNDTRIPLE` scope** — it was applied to non-ASCII characters although the
+    code's own comment, and `hunspell(5)`, say ASCII-only — the manual records that as a
+    limitation of the reference implementation ("Bug: missing multi-byte character support
+    in UTF-8 encoding"). Fixed to match the reference, since matching it is the point.
+  - **The CLI's UTF-8 sniffer** — accepted overlong encodings and surrogates while its own
+    comment claimed it rejected them. Fixed, and it now has a test; it had none, because the
+    CLI as a whole was outside `moon test`.
+- **Three deviations remain open, deliberately:**
   - **`PHONE` digit priorities** — parsed into the AST and never read, so they cannot
     influence the `<` re-scan (the claim that they do has been removed above).
-  - **`AM` morphological aliases** — parsed and never consumed.
+  - **`AM` morphological aliases** — parsed and never consumed; nothing reads the
+    morphological fields they would populate.
   - **The CLI's UTF-8 sniffer** — accepts overlong encodings and surrogates although its
     comment says it rejects them; it had no test of its own.
 - **The n-gram candidate generator** — Hunspell's last suggestion channel is absent.

@@ -200,3 +200,69 @@ test "parse_options names the unknown option it rejected" {
 test "parse_options reports a flag that has no value after it" {
   assert_eq(parse_err(["spell", "check", "--aff"]), "--aff needs a value")
 }
+
+// ------------------------------------------------------------- --help handling
+//
+// `spell --help` used to answer "unknown subcommand \"--help\"" and `spell check
+// --help` used to answer "--help needs a value" -- the first two things a new user
+// types, and a bad first impression on a repository whose README tells you to run the
+// CLI. The exit codes are asserted for real by `examples/ci-gate/run.sh`; what is
+// pinned here is the predicate that decides, and the text both printers read.
+
+///|
+test "wants_help sees --help and -h in option position" {
+  assert_true(wants_help(["spell", "check", "--help"]))
+  assert_true(wants_help(["spell", "check", "-h"]))
+  assert_true(wants_help(["spell", "suggest", "--help"]))
+  // after real options, which is where people actually put it
+  assert_true(wants_help(["spell", "check", "--aff", "a.aff", "--help"]))
+  assert_true(
+    wants_help(["spell", "check", "--aff", "a.aff", "--dic", "d.dic", "-h"]),
+  )
+}
+
+///|
+test "wants_help does not mistake a flag's value for a request for help" {
+  // `--help` here is the *value* of `--aff`, not an option: the scan steps two at a
+  // time precisely so a file called `--help` stays a file.
+  assert_false(wants_help(["spell", "check", "--aff", "--help"]))
+  assert_false(wants_help(["spell", "check", "--aff", "a.aff"]))
+  assert_false(wants_help(["spell", "check"]))
+  assert_false(wants_help(["spell", "suggest"]))
+}
+
+///|
+test "the usage text documents --help and both subcommands" {
+  let text = usage_lines().join("\n")
+  assert_true(text.contains("--help"))
+  assert_true(text.contains("spell check"))
+  assert_true(text.contains("spell suggest"))
+  assert_true(text.contains("--words"))
+}
+
+///|
+/// `is_valid_utf8` chooses between decoding a word list as UTF-8 and decoding it as the
+/// legacy encoding the `.aff` declares, so a byte sequence UTF-8 cannot represent must
+/// not be accepted as UTF-8. The function claimed to reject overlong forms and had no
+/// test; these are the cases that were wrong.
+test "is_valid_utf8 rejects overlong forms, surrogates and out-of-range code points" {
+  // 2-byte overlong for U+0049 (already rejected, kept as the control)
+  assert_false(is_valid_utf8(Bytes::from_array([0xC1, 0xA9])))
+  // 3-byte overlong for U+00E9
+  assert_false(is_valid_utf8(Bytes::from_array([0xE0, 0x83, 0xA9])))
+  // surrogate U+D800
+  assert_false(is_valid_utf8(Bytes::from_array([0xED, 0xA0, 0x80])))
+  // 4-byte overlong
+  assert_false(is_valid_utf8(Bytes::from_array([0xF0, 0x80, 0x80, 0xAF])))
+  // above U+10FFFF
+  assert_false(is_valid_utf8(Bytes::from_array([0xF4, 0x90, 0x80, 0x80])))
+  // truncated and stray continuation bytes
+  assert_false(is_valid_utf8(Bytes::from_array([0xE0, 0xA0])))
+  assert_false(is_valid_utf8(Bytes::from_array([0x80])))
+  // and the legal neighbours of each rejected case must still be accepted, or the
+  // function would have become useless rather than strict
+  assert_true(is_valid_utf8(@unicode.to_utf8_bytes("é")))
+  assert_true(is_valid_utf8(@unicode.to_utf8_bytes("€")))
+  assert_true(is_valid_utf8(@unicode.to_utf8_bytes("😀")))
+  assert_true(is_valid_utf8(@unicode.to_utf8_bytes("ascii")))
+}

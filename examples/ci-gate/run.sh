@@ -97,6 +97,56 @@ moon run examples/doccheck -- > "$TMP/out.txt" 2>&1
 RC=$?
 expect "no arguments" 2
 
+# ------------------------------------------------- the CLI's own exit statuses
+#
+# `cmd/main` is a *different* contract from `doccheck`: it prints one verdict per input
+# line and exits 0 even when a word is rejected, because the conformance and benchmark
+# harnesses read that verdict stream and would break otherwise. What it does use a
+# non-zero status for is being *called wrong* -- and those paths had no gate at all,
+# which is how `spell --help` could answer "unknown subcommand" unnoticed. These cases
+# are here because the status is the contract.
+
+hr
+echo "the CLI's own exit statuses (cmd/main):"
+echo
+
+moon run cmd/main -- --help > "$TMP/out.txt" 2>&1
+RC=$?
+expect "spell --help" 0
+
+moon run cmd/main -- check --help > "$TMP/out.txt" 2>&1
+RC=$?
+expect "spell check --help" 0
+
+moon run cmd/main -- suggest -h > "$TMP/out.txt" 2>&1
+RC=$?
+expect "spell suggest -h" 0
+
+# Requesting help writes to stdout so it can be piped; an error writes to stderr, so a
+# caller can still separate the two. Both halves are asserted, because getting the
+# wrong stream is the kind of bug a status check alone would not catch.
+moon run cmd/main -- --help > "$TMP/out.txt" 2> "$TMP/err.txt"
+if [ -s "$TMP/out.txt" ] && [ ! -s "$TMP/err.txt" ]; then
+  printf '  %-42s expected %s  got %s  ok\n' "--help on stdout, nothing on stderr" "yes" "yes"
+else
+  printf '  %-42s expected %s  got %s  UNEXPECTED\n' "--help on stdout, nothing on stderr" "yes" "no"
+  FAILED=1
+fi
+
+moon run cmd/main -- check --aff > "$TMP/out.txt" 2>&1
+RC=$?
+expect "flag with no value" 2
+
+moon run cmd/main -- nosuchcommand > "$TMP/out.txt" 2>&1
+RC=$?
+expect "unknown subcommand" 2
+
+moon run cmd/main -- > "$TMP/out.txt" 2>&1
+RC=$?
+expect "no arguments" 2
+
+
+
 echo
 echo "the gate written the way a workflow would use it:"
 echo
