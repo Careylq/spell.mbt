@@ -37,6 +37,16 @@ for the words it rejects.
 > [Not implemented yet](#not-implemented-yet) for what suggestion generation
 > still leaves out (ngram/`MAXNGRAMSUGS` candidates in particular).
 
+![spell.mbt judging words and suggesting corrections](docs/demo.png)
+
+*Verbatim output of `bash examples/basic/demo.sh` — offline, against a three-entry dictionary
+the script writes itself. One line per word: `1` is "correct", `0` is "not a word". The
+right-hand notes were added to make the verdicts readable; nothing else was edited, and the
+script reproduces this transcript byte for byte. It is worth reading because the four words
+exercise four different code paths — `form` is a direct hit, `cats` is not in the dictionary
+but `SFX S` makes it a word, `phorm` is found by the `.aff`'s `REP ph f` rule, and `frm` by
+edit distance.*
+
 ## Contents
 
 - [Conformance](#conformance) — 99.2% on the official Hunspell corpus, and the
