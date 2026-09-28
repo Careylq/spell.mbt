@@ -134,3 +134,69 @@ test "read_all_chunks propagates a read error" {
     Err(message) => assert_eq(message, "boom")
   }
 }
+
+// --------------------------------------------------------------- option parsing
+//
+// `parse_options` decides which files a `check` run reads, and its `Err` strings are
+// what a user sees on a mistake. The 69 lines of `main.mbt` that cover the option
+// parser, `run` and the exit-code mapping were outside `moon test` — the exit codes
+// were only exercised by `examples/ci-gate/run.sh`, which is a phase-2 (report-only)
+// step, which is how a parser wart can survive. These pin the parser itself.
+
+///|
+/// Run `parse_options` and abort on an unexpected error, so a test can assert on the
+/// parsed flags alone.
+fn parse_ok(args : Array[String]) -> Options {
+  match parse_options(args) {
+    Ok(options) => options
+    Err(message) => abort("unexpected parse error: \{message}")
+  }
+}
+
+///|
+/// Run `parse_options` and return the message, aborting if it unexpectedly succeeded.
+fn parse_err(args : Array[String]) -> String {
+  match parse_options(args) {
+    Ok(_) => abort("expected a parse error")
+    Err(message) => message
+  }
+}
+
+///|
+test "parse_options reads the three flags in any order" {
+  let options = parse_ok([
+    "spell", "check", "--dic", "d.dic", "--words", "w.txt", "--aff", "a.aff",
+  ])
+  assert_eq(options.aff, Some("a.aff"))
+  assert_eq(options.dic, Some("d.dic"))
+  assert_eq(options.words, Some("w.txt"))
+}
+
+///|
+test "parse_options leaves a flag it never saw as None" {
+  let options = parse_ok(["spell", "check", "--aff", "a.aff"])
+  assert_eq(options.aff, Some("a.aff"))
+  assert_eq(options.dic, (None : String?))
+  assert_eq(options.words, (None : String?))
+}
+
+///|
+test "a repeated flag keeps the last value" {
+  let options = parse_ok([
+    "spell", "check", "--aff", "one.aff", "--aff", "two.aff",
+  ])
+  assert_eq(options.aff, Some("two.aff"))
+}
+
+///|
+test "parse_options names the unknown option it rejected" {
+  assert_eq(
+    parse_err(["spell", "check", "--aff", "a.aff", "--oops", "x"]),
+    "unknown option \"--oops\"",
+  )
+}
+
+///|
+test "parse_options reports a flag that has no value after it" {
+  assert_eq(parse_err(["spell", "check", "--aff"]), "--aff needs a value")
+}

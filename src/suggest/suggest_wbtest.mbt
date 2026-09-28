@@ -68,3 +68,45 @@ test "MAP groups split single characters and parenthesized sequences" {
   assert_eq(parse_map_groups(["a"]).length(), 0)
   assert_eq(parse_map_groups(["ab", "c"]).length(), 1)
 }
+
+///|
+/// `Ranker::adjacent` is the whole of the `KEY` ranking rule, and it had no test: the
+/// README listed "keyboard-adjacent (via `KEY`)" as a ranking source while nothing
+/// pinned what "adjacent" means for the staggered layout the code is written for.
+test "adjacent covers in-row and staggered cross-row neighbours" {
+  // The bottom row is deliberately one column shorter than the others, which is where
+  // an off-by-one in the column window shows up.
+  let r : Ranker = {
+    try_array: [],
+    key_rows: parse_key_rows("qwertyuiop|asdfghjkl|zxcvbnm"),
+    map_groups: [],
+  }
+  // the same row, both directions
+  assert_true(r.adjacent('q', 'w'))
+  assert_true(r.adjacent('w', 'q'))
+  // the row below: same column, and one column of offset either way
+  assert_true(r.adjacent('q', 'a'))
+  assert_true(r.adjacent('q', 's'))
+  // the short bottom row against the row above it
+  assert_true(r.adjacent('z', 'a'))
+  assert_true(r.adjacent('m', 'j'))
+  // far apart in the same row block, and five columns offset
+  assert_false(r.adjacent('q', 'h'))
+  assert_false(r.adjacent('p', 'a'))
+  // a key is not its own neighbour
+  assert_false(r.adjacent('a', 'a'))
+  // characters that are not on the layout at all
+  assert_false(r.adjacent('1', '2'))
+}
+
+///|
+test "edit_alphabet falls back to ASCII when the .aff declares no TRY" {
+  assert_eq(default_alphabet(), "abcdefghijklmnopqrstuvwxyz")
+  // No TRY: the generator must still have an alphabet to edit with, and it must be
+  // the documented default rather than an empty one.
+  let without = @spell.Dictionary::from_text("SET UTF-8", "1\nhello")
+  assert_eq(edit_alphabet(without), dedupe_chars(default_alphabet()))
+  // A TRY line, with a duplicate, replaces the default rather than adding to it.
+  let with_try = @spell.Dictionary::from_text("SET UTF-8\nTRY abca", "1\nhello")
+  assert_eq(edit_alphabet(with_try), ['a', 'b', 'c'])
+}

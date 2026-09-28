@@ -10,7 +10,7 @@
 |---|---|---|
 | 章程阶段三「项目验收」 | **9 条**（第 9 条含两个子句 → 按 10 行自检） | [§一](#一章程阶段三项目验收9-条--10-行) |
 | 章程第七章「开源与成果提交要求」 | **10 条** | [§二](#二章程第七章开源与成果提交要求10-条) |
-| 官网「验收标准」 | **6 条** | [§三](#三官网验收标准6-条) |
+| **赛方《验收指南》**（2026-09-28 收到，取代早先的官网 6 条） | **9 条** | [§三](#三赛方验收指南9-条) |
 | 组委会初审邮件补充的评估维度 | **4 个** | [§四](#四组委会初审邮件补充的-4-个评估维度) |
 | 本人申报书承诺的范围 | **7 条核心功能 + 3 个使用场景** | [§五](#五与申报书的一致性对照) |
 
@@ -34,15 +34,15 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 | # | 章程要求 | 状态 | 证据位置 |
 |---|---|---|---|
 | 1 | 项目以 **MoonBit 为主要实现语言** | ✅ | `src/` **6,749 行**（6 个库包）+ `cmd/main` 601 行 + `examples/` 958 行，**全部 MoonBit**；库包无 `extern`、无 C、无 FFI。仓库内唯一 C 是 CLI 的 46 行 stdin 垫片（原因见 [README](README.md#native-code)） |
-| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；提交按功能分组、连续可追溯；`DEVLOG.md` 逐条记录（Day 1–15；这是**工作切片**编号，不是自然日） |
+| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；提交按功能分组、连续可追溯；`DEVLOG.md` 逐条记录（Day 1–17；这是**工作切片**编号，不是自然日） |
 | 3 | 源代码结构清晰，**能完成声明的核心功能** | ✅ | `src/aff`（.aff 解析）· `src/dic`（.dic 解析）· `src/affix`（条件匹配）· `src/spell`（判定引擎）· `src/suggest`（建议引擎）· `src/api`（公开 API）· `cmd/main`（CLI） |
 | 4 | 提供 **README**：项目目标 / 安装方式 / 使用方法 / 示例 / **可复现** | ✅ | [`README.mbt.md`](README.mbt.md)（英文，权威）+ [`README.zh.mbt.md`](README.zh.mbt.md)（中文）；两版都是 `.mbt.md`，代码块受 `moon check` 编译。含安装（含 `moon.pkg` 写法）、Quick start、CLI、以及一条命令的全量复现 |
 | 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) **11 个声明步骤**（GitHub UI 显示为 14，含 `Set up job` / `Post Checkout` / `Complete job`）：`moon check` / `build` / `test --target all` / 跨后端构建 / 符合率报告 / **本仓库自身文档的拼写门禁** / 退出码契约自检。另有手动触发的 `bench.yml` |
 | 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ | 三个：[`examples/basic`](examples/basic)（`moon run examples/basic` 直接跑）· [`examples/doccheck`](examples/doccheck)（用本库检查本仓库文档）· [`examples/ci-gate`](examples/ci-gate)（**离线**证明退出码可作 CI 门禁） |
-| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **182 个测试**（native **186 个**），四后端全通过；测试代码 3,323 行；另有符合率框架 `conformance/` |
+| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **200 个测试**（native **204 个**），四后端全通过；测试代码 **3,578 行**；另有官方语料框架 `conformance/` |
 | 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.9.6`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
 | 9 | 采用 **OSI 认可的开源许可证** | ✅ | [`LICENSE`](LICENSE) = Apache-2.0（OSI 认证） |
-| 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | [`NOTICE`](NOTICE)：参考 Hunspell（LGPL-2.1）的**格式规范与可观察行为**，未复制源码；测试语料与词典**不随仓库分发**，均由脚本运行时拉取 |
+| 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | [`NOTICE`](NOTICE)：参考 Hunspell（**三许可 MPL-1.1 / GPL-2.0 / LGPL-2.1**，按最保守的 LGPL-2.1 判断）与 Aspell 的**格式规范与可观察行为**，未复制源码；测试语料与词典**不随仓库分发**，运行时拉取且**钉 tag `v1.7.4`** |
 
 ---
 
@@ -80,16 +80,28 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 
 ---
 
-## 三、官网「验收标准」（6 条）
+## 三、赛方《验收指南》（9 条）
 
-| # | 官网标准 | 我们的情况 |
+> 原文（2026-09-28 收到）：「审核通过的选手，验收前不需要再提交任何表格，只需保持开发，
+> 对应开发内容上传到 Github 即可。」以下 9 条即验收依据。**它取代了此前官网列的 6 条标准**，
+> 本表按 9 条重建。另有赛方说明：**只有「项目方向发生变化」才需要重新提交申报书** ——
+> 本项目方向未变（见 [§五](#五与申报书的一致性对照) 与 `DEVLOG.md` Day 17）。
+>
+> **与 §一 的关系**：这 9 条与章程阶段三（[§一](#一章程阶段三项目验收9-条--10-行)）**基本同源**，
+> 措辞更具体。差异点值得单独指出：第 1 条把工具链要求明确成 **`moonc ≥ 0.10.14`**，
+> 第 7 条把「测试」明确成「**完整测试，覆盖核心功能路径**」。两条本文件都已逐条核对。
+
+| # | 验收指南原文 | 我们的情况 |
 |---|---|---|
-| 1 | **MoonBit 为主** —— 以 MoonBit 作为项目主要实现语言 | 见 [§一](#一章程阶段三项目验收9-条--10-行) 第 1 条；库包零 FFI |
-| 2 | **仓库公开** —— 保留连续、可追踪的提交与开发记录 | 见 §一 第 2 条 |
-| 3 | **能够运行** —— 提供清晰 README、可运行示例与必要测试 | 见 §一 第 4、6、7 条；README 的安装与 Quick start 已按**全新消费者项目**实测（`moon new` → `moon add Careylq/spell` → 照抄文档可跑通） |
-| 4 | **工作有效** —— 已有项目须含本期实质新增工作 | 本项目本期**从零建成**，全部为新增工作 |
-| 5 | **开源合规** —— 使用认可的开源许可证，并说明移植或参考来源 | 见 §一 第 9、10 条与 §二 第 5–8 条 |
-| 6 | **AI 可解释** —— 可以使用 AI 辅助，但目标、路径与质量必须由参赛者掌握 | 见 §二 第 9 条专述 |
+| 1 | 项目以 **MoonBit 为主要实现语言**，`moonc` 版本**不低于 0.10.14** | ✅ **`moonc v0.10.14+7d59c7ec9`**（不低于 0.10.14）。`src/` 六个库包**全部是 MoonBit，零 FFI**；仓库内唯一的 C 是 `cmd/main/stdin_native.c`（46 行，仅 native 后端的流式 stdin，库包不含）；`preferred_target = "wasm"` |
+| 2 | GitHub 仓库**公开可访问**，**提交记录清晰** | ✅ https://github.com/Careylq/spell.mbt （public）。提交**按功能分组**、信息说明「改了什么、为什么、怎么验证」；`DEVLOG.md` 逐条记录设计取舍 |
+| 3 | **源代码结构清晰**，能够完成**声明的核心功能** | ✅ 六个库包依赖单向无环（`aff` ← {`dic`,`affix`} ← `spell` ← `suggest` ← `api`），根包只做 re-export；**申报书声明的核心功能逐条交付**（[§5.1](#51-核心功能范围申报书-核心功能范围-全部交付)），其中两项还超额完成（[§5.3](#53-申报书写明本期暂不实现的四项)） |
+| 4 | 提供 **README**，说明**项目目标、安装方式、使用方法、示例**，并**可复现** | ✅ [`README.mbt.md`](README.mbt.md)（+ 中文版）含 Goal / Install / Quick start / Examples，顶部有「For reviewers」速览与**目录**；可复现性：语料**钉 tag `v1.7.4`**、每条命令的**前提条件逐条列表**（[§八](#八如何复现)）、`check-all.sh` 一条命令重跑；安装与最小用例已按**全新消费者项目**实测（`moon new` → `moon add Careylq/spell` → 照抄文档即跑通） |
+| 5 | 使用**持续集成**工具并且覆盖**检查、构建、测试**流程 | ✅ [`.github/workflows/ci.yml`](.github/workflows/ci.yml) **11 个声明步骤**（GitHub UI 显示 14）：`moon check` → `moon build` → `moon test --target all` → 跨后端 check/build → 符合率报告 → **本仓库自身文档的拼写门禁**（阻塞）→ **退出码契约自检**（阻塞）。当前 HEAD 全绿 |
+| 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ **三个**：`examples/basic`（内嵌自写词典的完整示例）、`examples/doccheck`（把本库当 CI 门禁用，吃自己狗粮）、`examples/ci-gate`（**离线**断言退出码契约的五用例）。另有 README 的 Quick start 与 `mbt check` 文档测试 |
+| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ `moon test --target all` → **200 个测试**（native **204 个**），**四后端全通过**；测试代码 3,578 行，含反例与错误分支。**本轮补上了审计发现的测试空白**：`ICONV`/`OCONV`（此前**零测试**）、`src/api` 的元数据访问器、CLI 参数解析、`KEY` 邻接排序、无 `TRY` 时的回退。另有 `conformance/` 的官方语料框架作为外部对照 |
+| 8 | **发布到 mooncakes.io** | ✅ https://mooncakes.io/docs/Careylq/spell —— **15 个版本**（0.1.0 → 0.9.6），最新版 `build_status: success` |
+| 9 | 采用 **OSI 认可**的开源许可证；如**参考或移植**其他开源项目，应符合原项目许可证要求 | ✅ **Apache-2.0（OSI 认可）**。参考 Hunspell 与 Aspell 的**格式规范与公开行为**，未复制其实现代码；[`NOTICE`](NOTICE) 列明参考范围、Hunspell 的**三许可**（MPL-1.1 / GPL-2.0 / LGPL-2.1，按最保守的 LGPL-2.1 判断）、依赖 `moonbitlang/x` 的 Apache-2.0，并**主动披露**测试夹具与上游的少量逐行重合及判断依据 |
 
 ---
 
@@ -100,7 +112,7 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 | 维度 | 结论 | 证据 |
 |---|---|---|
 | **项目完成度** | Hunspell `.aff`/`.dic` 的**解析 → 词缀推导 → 判定 → 建议**全链路打通。官方语料 `.good` **99.2%**、`.wrong` **99.7%**；真实词典上与 C++ Hunspell 判定基本一致（235,976 词上分歧 **0.084%**） | [§六](#六已实测指标每条都可用仓库内脚本复现) |
-| **代码质量** | **182 / 186** 个测试 × 四后端全通过；`moon check --deny-warn --target all` **0 warning**；`moon fmt --check` 干净；`.mbti` 公开接口 diff 为空；CI 全绿（11 个声明步骤）；每个实测数字都有脚本，且**每个未通过用例都逐条列明并解释为什么不猜** | `check-all.sh`；[README](README.md#conformance) |
+| **代码质量** | **200 / 204** 个测试 × 四后端全通过；`moon check --deny-warn --target all` **0 warning**；`moon fmt --check` 干净；`.mbti` 公开接口 diff 为空；CI 全绿（11 个声明步骤）；每个实测数字都有脚本，且**每个未通过用例都逐条列明并解释为什么不猜** | `check-all.sh`；[README](README.md#conformance) |
 | **开源合规性** | Apache-2.0；`NOTICE` 声明参考范围并隔离 LGPL-2.1；语料与词典不分发；依赖唯一且为纯 MoonBit | [`NOTICE`](NOTICE)；[§二](#二章程第七章开源与成果提交要求10-条) |
 | **与 MoonBit 生态的相关性** | 本项目 0.1.0 于 **2026-09-22** 发布，当时以 `hunspell`/`spell`/`affix`/`stemmer`/`snowball`/`hyphenation`/`thesaurus` 检索 mooncakes.io 均为 0 命中；**此后同赛道出现了另一个包**（`wccerty/moonspell`，2026-09-27 首发），已在 README 里如实写明并给出可核验的差异数据；此外四后端可用、公开 API 全部带 `///` 文档、可直接 `moon add`，并有**吃自己狗粮**的 `doccheck` | [README · Ecosystem relevance](README.md#ecosystem-relevance) |
 
@@ -341,7 +353,7 @@ bash check-all.sh
 
 # 或分别运行
 moon check --deny-warn --target all   # 0 error, 0 warning
-moon test  --target all               # 182 / 186，四后端
+moon test  --target all               # 200 / 204，四后端
 moon fmt --check && moon info         # 格式干净；.mbti diff 为空
 bash conformance/run.sh               # 官方语料符合率
 bash conformance/suggest.sh           # .sug 建议质量
@@ -371,7 +383,7 @@ moon run examples/basic               # 可运行示例
 
 - [x] `moon check --deny-warn --target all` 无错误、无警告
 - [x] `moon build` 通过（wasm / wasm-gc / js / native 四后端 release 均成功）
-- [x] `moon test --target all` 全部通过（182 / 182 / 182 / 186）
+- [x] `moon test --target all` 全部通过（200 / 200 / 200 / 204）
 - [x] `moon fmt --check` 干净；`moon info` 的 `.mbti` diff 为空
 - [x] CI 全步骤 success（11 个声明步骤，含两步阻塞式门禁）
 - [x] README 与本文的数字全部是**实测**的，且由 `check-all.sh` 可复现

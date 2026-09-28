@@ -339,3 +339,41 @@ test "a PHONE suggestion is dressed in the input's capitalisation" {
   assert_true(@suggest.suggest(dictionary, "Kt", 5).contains("Cat"))
   assert_true(@suggest.suggest(dictionary, "KT", 5).contains("CAT"))
 }
+
+///|
+/// `OCONV` rewrites the **output** — each suggestion as it leaves the engine — so a
+/// user sees candidates in the form they typed. Like `ICONV`, the directive was parsed
+/// and wired in, but nothing exercised it.
+test "OCONV converts suggestion output" {
+  let d = load(
+    "SET UTF-8\nTRY abcdefghijklmnopqrstuvwxyz'\nOCONV 1\nOCONV ' ’", "1\ndon't",
+  )
+  let out = @suggest.suggest(d, "don'tt", 10)
+  assert_true(out.contains("don’t"))
+  // Control: the same dictionary without OCONV returns the straight apostrophe, so the
+  // assertion above is testing the conversion and not the suggestion source.
+  let plain = load("SET UTF-8\nTRY abcdefghijklmnopqrstuvwxyz'", "1\ndon't")
+  let plain_out = @suggest.suggest(plain, "don'tt", 10)
+  assert_true(plain_out.contains("don't"))
+  assert_false(plain_out.contains("don’t"))
+}
+
+///|
+test "a KEY-adjacent substitution outranks a non-adjacent one" {
+  let dic =
+    #|2
+    #|pat
+    #|put
+  // `pyt` is one substitution away from both `pat` (y -> a) and `put` (y -> u). On the
+  // layout below `y` and `u` are neighbours and `y` and `a` are five columns apart, so
+  // the KEY line must move `put` ahead of the candidate TRY order would pick.
+  let keyed = load(
+    "SET UTF-8\nTRY abcdefghijklmnopqrstuvwxyz\nKEY qwertyuiop|asdfghjkl|zxcvbnm",
+    dic,
+  )
+  assert_eq(@suggest.suggest(keyed, "pyt", 5), ["put", "pat"])
+  // Control: without KEY both are plain substitutions, TRY order decides, and `pat`
+  // comes first. This is what makes the assertion above a test of KEY.
+  let plain = load("SET UTF-8\nTRY abcdefghijklmnopqrstuvwxyz", dic)
+  assert_eq(@suggest.suggest(plain, "pyt", 5), ["pat", "put"])
+}

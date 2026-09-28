@@ -87,6 +87,37 @@ release**; the engine's measured behaviour is identical.
 - `.gitignore` now ignores `*.aff` / `*.dic` / `*.good` / `*.wrong` / `*.sug` as a safety net,
   in case someone points `SPELL_DICT_DIR` or `HUNSPELL_DIR` at the working tree.
 
+### Added — tests for features the README claimed and nothing pinned
+
+Prompted by the same audit, and by the acceptance guide's item 7 ("complete tests covering
+the core functional paths"). **No library behaviour changed** — these are tests only, and
+each one was mutation-tested by breaking the code it covers and confirming the test fails.
+Tests: 182 → **200** (wasm/wasm-gc/js), 186 → **204** (native).
+
+- **`ICONV` / `OCONV` had no test at all** while both READMEs listed them as implemented.
+  Now covered: input conversion before lookup, longest-pattern-first ordering, the
+  end-of-word `_` marker, output conversion of suggestions, and — in each case — a
+  **control run without the directive** so the assertion cannot pass through some other
+  acceptance path. Short-circuiting `apply_conversion(self.iconv, word)` fails three tests;
+  short-circuiting `apply_oconv` fails the fourth.
+- **`KEY` adjacency had no test** although "keyboard-adjacent (via `KEY`)" was a listed
+  ranking source. Added a whitebox test of `Ranker::adjacent` (in-row both directions,
+  staggered cross-row within one column, the shorter bottom row, and the negative cases)
+  and a blackbox test that a `KEY`-adjacent substitution is ranked ahead of a
+  non-adjacent one — with a control run without `KEY` that produces the opposite order,
+  which is what makes it a test of `KEY` rather than of `TRY` order.
+- **The `TRY`-absent fallback had no test**: every existing test wrote a `TRY` line, so
+  `default_alphabet()` never ran. Now covered, including that a `TRY` line replaces the
+  default rather than adding to it, and that duplicates are collapsed.
+- **`src/api` had no test file.** Added one for the four metadata accessors
+  (`encoding`, `flag_type_name` across all four `FLAG` modes, `rule_count`, `entry_count`)
+  and for the facade's promise that every suggestion is a word `check` accepts.
+- **The CLI's option parser was outside `moon test`.** Added whitebox tests for the three
+  flags in any order, unseen flags staying `None`, last-value-wins on a repeated flag, and
+  both error strings. The exit-code mapping was previously exercised only by
+  `examples/ci-gate/run.sh`, a phase-2 (report-only) step — which is how a parser wart
+  survives.
+
 ## [0.9.6] — 2026-09-27
 
 Documentation, repository hygiene and CI. No library code or interface change.

@@ -127,6 +127,9 @@ McEval
 LLMs
 Giagnorio
 Bavota
+# `Github` (lower-case h) appears only inside a verbatim quotation of the
+# organisers' acceptance message; the quotation is left as written.
+Github
 
 # --- ordinary English words a size-60 SCOWL list omits -------------------
 # `artefact` and `normalisation` are the British spellings used by this

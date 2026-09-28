@@ -14,7 +14,7 @@ for the words it rejects.
 > |---|---|
 > | Conformance (official Hunspell corpus, corpus pinned to tag `v1.7.4`) | `.good` **847/854 = 99.2%** · `.wrong` **611/613 = 99.7%** |
 > | Differential test vs hunspell 1.7.3 | 235,976 real words: **199 disagreements = 0.084%** |
-> | Tests | **182** (wasm / wasm-gc / js) · **186** (native) |
+> | Tests | **200** (wasm / wasm-gc / js) · **204** (native) |
 > | Direct lookup vs hunspell | **parity** (0.32–0.38 vs 0.36–0.38 µs/word; the ratio crosses 1.0 both ways) |
 > | wasm artifact | **142.2 KiB**, with no C++ runtime |
 >
@@ -801,14 +801,17 @@ cannot drift away from the code.
   - 知乎 — https://zhuanlan.zhihu.com/p/2087606024068976886
   - 掘金 — https://juejin.cn/post/7689644399769796649
 
-  (Chinese. Every measured number in it was taken from this repository, but one has
+  (Chinese. Every measured number in it was taken from this repository, but some have
   moved since publication: the article and the cover say **178 / 182** tests, and the
-  repository now has **182 / 186**. Two of the three increments come from `mbt check`
+  repository now has **200 / 204**. The increments come from two sources. First, `mbt check`
   blocks added to the Quick start above and to `README.zh.mbt.md`: a block containing a
-  `test` is executed by `moon test`, so documenting a behaviour now enforces it. The third
-  is the Chinese README's own examples. Where the article and this repository ever
-  disagree, this file and the scripts that produce it win — which is the article's own
-  point.)
+  `test` is executed by `moon test`, so documenting a behaviour now enforces it. Second,
+  tests added after an independent audit found features this README *claimed* while nothing
+  pinned them: `ICONV`/`OCONV` had no test at all, and `src/api`'s metadata accessors, the
+  CLI's option parser, `KEY` adjacency and the missing-`TRY` fallback were equally
+  unpinned — every one of those was mutation-tested, by breaking the code and confirming
+  the new test fails. Where the article and this repository ever disagree, this file and
+  the scripts that produce it win — which is the article's own point.)
 
 ## License
 

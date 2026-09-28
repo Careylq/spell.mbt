@@ -1192,3 +1192,38 @@ test "an affixed form of a forbidden word is forbidden" {
   assert_false(dictionary.check("banned"))
   assert_false(dictionary.check("banneds"))
 }
+
+///|
+/// `ICONV` rewrites the **input** word before any matching. The `.aff` directives that
+/// configure it were parsed and wired into the lookup path, but no test exercised that
+/// path — this and the two tests below are that test.
+test "ICONV converts the input word before lookup" {
+  // The dictionary stores the straight apostrophe; the user types the curly one.
+  let d = load("SET UTF-8\nICONV 1\nICONV ’ '", "1\ndon't")
+  assert_true(d.check("don't"))
+  assert_true(d.check("don’t"))
+  // Control: with no ICONV the very same input must be rejected, so the assertion
+  // above is testing the conversion and not some other acceptance path.
+  let plain = load("SET UTF-8", "1\ndon't")
+  assert_false(plain.check("don’t"))
+}
+
+///|
+test "ICONV applies the longest matching pattern first" {
+  // `ab` must become `c` (longest wins) rather than `bb` (shortest first), so a
+  // dictionary holding `b` and `c` accepts `a` and `ab` but would reject `ab` if the
+  // shorter pattern were applied first.
+  let d = load("SET UTF-8\nICONV 2\nICONV a b\nICONV ab c", "2\nb\nc")
+  assert_true(d.check("a"))
+  assert_true(d.check("ab"))
+}
+
+///|
+test "ICONV honours the end-of-word marker" {
+  // `ICONV x_ y` only rewrites an `x` that is the last character. So `ax` becomes `ay`
+  // while `xa` keeps its `x` (and is then not a word).
+  let d = load("SET UTF-8\nICONV 1\nICONV x_ y", "1\nay")
+  assert_true(d.check("ax"))
+  assert_false(d.check("xa"))
+  assert_false(d.check("axx"))
+}

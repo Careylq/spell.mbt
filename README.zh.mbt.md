@@ -20,7 +20,7 @@
 > |---|---|
 > | 官方语料符合率 | `.good` **847/854 = 99.2%** · `.wrong` **611/613 = 99.7%** |
 > | 与 hunspell 1.7.3 差分测试 | 235,976 个真实词：分歧 **199 个 = 0.084%** |
-> | 测试 | **182** 个（wasm / wasm-gc / js）· **186** 个（native） |
+> | 测试 | **200** 个（wasm / wasm-gc / js）· **204** 个（native） |
 > | 直接查表 vs hunspell | **持平**（0.32–0.38 vs 0.36–0.38 µs/词；比值会跨过 1.0） |
 > | wasm 产物 | **142.2 KiB**，无 C++ 运行时 |
 >
@@ -215,7 +215,7 @@ wasm 产物 142 KiB 且**无 C++ 运行时**。
 
 ### 工程质量
 
-**182 个测试**（native **186 个**）× 四后端全通过 · `moon check --deny-warn --target all`
+**200 个测试**（native **204 个**）× 四后端全通过 · `moon check --deny-warn --target all`
 0 warning · `moon fmt --check` 干净 · `moon info` 的 `.mbti` diff 为空 ·
 `docs/MOONBIT_GOTCHAS.md` 收录 **43 条**由编译器/运行时验证的 MoonBit 坑。
 
