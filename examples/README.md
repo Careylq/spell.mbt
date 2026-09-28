@@ -107,16 +107,16 @@ is not clean, and the numbers below are from actual runs, not estimates.
 ### Measured on this repository (moon 0.1.20260920, en_US SCOWL size 60)
 
 The word count grows with the repository's own prose, so these are a **snapshot of the
-0.9.5 tree**; re-running the command prints the current figures.
+0.9.6 tree**; re-running the command prints the current figures.
 
 | run | files | words checked | misspelled tokens | distinct words |
 |---|---|---|---|---|
-| first run, no allowlist | 34 | 19,871 | 576 | 116 |
-| after `allowlist.txt` (107 entries) | 34 | 19,871 | **0** | **0** |
-| `--include-tests` (allowlist on) | 48 | 21,511 | 14 | 11 |
+| first run, no allowlist | 34 | 20,287 | 616 | 118 |
+| after `allowlist.txt` (109 entries) | 34 | 20,287 | **0** | **0** |
+| `--include-tests` (allowlist on) | 46 | 21,887 | 13 | 10 |
 
-All 116 distinct words the first run flagged were reviewed by hand: **none was a
-typo.** 116 of 116 were false positives of a general dictionary on a technical
+All 118 distinct words the first run flagged were reviewed by hand: **none was a
+typo.** 118 of 118 were false positives of a general dictionary on a technical
 repository — project vocabulary (`wasm`, `stdin`, `backend`, `aff`, `dic`), the
 Hunspell/affix terminology this project is about (`Fuge`, `endchars`,
 `circumfix`, `ngram`, `checksharps`), MoonBit and third-party proper nouns

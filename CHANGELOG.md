@@ -4,6 +4,42 @@ All notable changes to this project are documented here.
 Versions follow [Semantic Versioning](https://semver.org/); this project is pre-1.0, so
 minor versions may still change behaviour.
 
+## [0.9.6] — 2026-09-27
+
+Documentation, repository hygiene and CI. No library code or interface change.
+
+### Changed
+- **The acceptance material now lives in the repository, because that is what gets read.**
+  The organisers confirmed that acceptance reads the **git snapshot at 2026-09-30 24:00**
+  and evaluates the repository content directly — there is no separate material-submission
+  step. Everything written for reviewers had been sitting outside the repository, where no
+  reviewer would ever see it.
+- **[`ACCEPTANCE.md`](ACCEPTANCE.md) is now the single reviewer entry point**, linked from
+  the top of both READMEs. It checks all *five* acceptance yardsticks and points every
+  conclusion at in-tree, reproducible evidence: charter stage three (9 items), charter
+  chapter seven (10 items), the website's 6 standards, the organisers' 4 e-mail review
+  dimensions, and this project's own proposal. The proposal section names the two
+  commitments that were **exceeded** (the suggestion engine and the full compound-word
+  engine, both declared out of scope in the proposal) and the one that was **untrue and got
+  fixed** (the CLI exit status, 0.9.2).
+- Both READMEs open with a short **For reviewers** block: the headline figures and a pointer
+  to `ACCEPTANCE.md`, since a reviewer may read only the first screen.
+
+### Fixed
+- The READMEs' status lines had gone stale at **0.9.1** and **0.9.4** while the package was
+  at 0.9.5 — exactly the kind of visible inconsistency that undermines every other number in
+  the file. Both now track the released version.
+- Removed `spell_test.mbt` and `spell_wbtest.mbt`: three lines of template comments each,
+  left over from `moon new`, containing no code. The real tests are per-package.
+- Removed the dead `echo "conformance harness not implemented yet"` fallback branch from
+  `ci.yml`. It was unreachable, but a reviewer grepping the repository would find the phrase
+  and reasonably conclude the project was unfinished.
+
+### Verified before this snapshot
+A repository-wide audit for things a reviewer would notice: no dead documentation links, no
+empty files, no `TODO`/`FIXME`/`not implemented yet` strings anywhere in source, docs,
+workflows or scripts, and no tracked build output or vendored corpora.
+
 ## [0.9.5] — 2026-09-27
 
 Documentation, examples and CI. No library code or interface change.

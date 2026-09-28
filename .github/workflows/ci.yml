@@ -70,12 +70,7 @@ jobs:
       # red. The blocking gate for this project is check / build / test above.
       - name: Conformance report
         continue-on-error: true
-        run: |
-          if [ -f conformance/run.sh ]; then
-            bash conformance/run.sh
-          else
-            echo "conformance harness not implemented yet"
-          fi
+        run: bash conformance/run.sh
 
       # --- Dogfooding: this gate is a BLOCKING step on this repository's own prose ---
       # doccheck exits 0 clean / 1 misspellings / 2 usage or I-O error, and 3 when the

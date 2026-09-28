@@ -18,6 +18,7 @@ mooncakes
 moonrun
 mbt
 doccheck
+READMEs
 wasm
 llvm
 toolchain
@@ -109,6 +110,7 @@ parenthesised
 neighbour
 neighbours
 neighbouring
+organisers
 honoured
 tokenisation
 tokenising

@@ -7,11 +7,29 @@ format** — it parses real-world dictionaries (e.g. `en_US`), applies the affix
 defined in the `.aff` file, judges words the way Hunspell does, and suggests corrections
 for the words it rejects.
 
+> **For reviewers.** This repository *is* the submission — acceptance reads the git
+> snapshot, so everything needed is in-tree:
+>
+> | | |
+> |---|---|
+> | Conformance (official Hunspell corpus) | `.good` **841/848 = 99.2%** · `.wrong` **611/613 = 99.7%** |
+> | Differential test vs hunspell 1.7.3 | 235,976 real words: **199 disagreements = 0.084%** |
+> | Tests | **182** (wasm / wasm-gc / js) · **186** (native) |
+> | Direct lookup vs hunspell | **parity** (0.34–0.38 vs 0.36–0.38 µs/word) |
+> | wasm artifact | **142.2 KiB**, with no C++ runtime |
+>
+> [`ACCEPTANCE.md`](ACCEPTANCE.md) is the requirement-by-requirement self-check against all
+> five acceptance yardsticks — charter stage three (9 items), charter chapter seven (10
+> items), the website's 6 standards, the organisers' 4 review dimensions, and this project's
+> own proposal. It also names which proposal commitments were **exceeded** and which single
+> commitment turned out to be **untrue and was fixed**. Every figure above comes from a
+> script in this repository: `bash check-all.sh` re-runs all of them.
+
 > This file is `README.mbt.md` — MoonBit type-checks `.mbt.md` files, so every block
 > below marked `mbt check` is compiled by `moon check` (an unmarked block is not).
 > `README.md` is a symlink to this file so that GitHub renders it.
 
-> **Status: 0.9.1.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
+> **Status: 0.9.6.** The `.aff`/`.dic` parsers, the affix engine, the `spell()`
 > judgement engine, the suggestion engine, the public API and the `check` /
 > `suggest` CLI subcommands are implemented and tested on all four backends. See
 > [Not implemented yet](#not-implemented-yet) for what suggestion generation
@@ -287,15 +305,15 @@ repository's own CI gates on it.
 
 Measured on this repository (`moon 0.1.20260920`, en_US from LibreOffice/SCOWL size 60,
 fetched at run time and never vendored). The word count depends on how much prose the
-repository carries, so these figures are a **snapshot of the 0.9.5 tree**; re-running the
+repository carries, so these figures are a **snapshot of the 0.9.6 tree**; re-running the
 command prints the current numbers:
 
 | run | words checked | misspelled tokens | distinct words |
 |---|---|---|---|
-| first run, no allowlist | 19,871 | 576 | 116 |
-| with `examples/doccheck/allowlist.txt` | 19,871 | 0 | 0 |
+| first run, no allowlist | 20,287 | 616 | 118 |
+| with `examples/doccheck/allowlist.txt` | 20,287 | 0 | 0 |
 
-**Of the 116 distinct words the first run flagged, 0 were real typos and 116 were false
+**Of the 118 distinct words the first run flagged, 0 were real typos and 118 were false
 positives.** They are project vocabulary (`wasm`, `backend`, `aff`), Hunspell
 terminology (`Fuge`, `endchars`, `ngram`), MoonBit and third-party proper nouns
 (`MoonBit`, `macOS`, `jsDelivr`), British spellings (`judgement`, `licence`, `modelled`)

@@ -104,7 +104,7 @@ bash examples/doccheck/run.sh            # see what it flags
 ```
 
 The numbers from doing exactly that on this repository are in
-[`examples/README.md`](../README.md#examplesdoccheck): 576 flagged tokens / 116 distinct
+[`examples/README.md`](../README.md#examplesdoccheck): 616 flagged tokens / 118 distinct
 words on the first run, **0** after the allowlist, and **0 of the 114 were real typos**.
 
 **`cmd/main check` is not the gate, and that is on purpose.** It prints one verdict per
