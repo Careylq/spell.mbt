@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml/badge.svg)](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml)
 
+**中文**（本文件）· [**English**](README.md) —— 英文版是**权威版本**：完整实测表格、
+逐条未实现清单与全部可复现命令以它为准。
+
 纯 MoonBit 实现的拼写检查库，兼容 **Hunspell 的 `.aff` / `.dic` 词典格式**：
 能解析真实世界的词典（如 `en_US`）、按 `.aff` 里的词缀规则做形态推导、像 Hunspell 一样
 判定单词，并对判为错误的词给出修改建议。
@@ -20,12 +23,12 @@
 > |---|---|
 > | 官方语料符合率 | `.good` **847/854 = 99.2%** · `.wrong` **611/613 = 99.7%** |
 > | 与 hunspell 1.7.3 差分测试 | 235,976 个真实词：分歧 **199 个 = 0.084%** |
-> | 测试 | **200** 个（wasm / wasm-gc / js）· **204** 个（native） |
+> | 测试 | **206** 个（wasm / wasm-gc / js）· **210** 个（native） |
 > | 直接查表 vs hunspell | **持平**（0.32–0.38 vs 0.36–0.38 µs/词；比值会跨过 1.0） |
 > | wasm 产物 | **142.2 KiB**，无 C++ 运行时 |
 >
 > [`ACCEPTANCE.md`](ACCEPTANCE.md) 是**逐条自检表**，对照全部五份验收口径 ——
-> 章程阶段三（9 条）、章程第七章（10 条）、官网（6 条）、组委会邮件的 4 个评估维度、
+> 章程阶段三（9 条）、章程第七章（10 条）、**赛方《验收指南》（9 条）**、组委会邮件的 4 个评估维度、
 > 以及本项目自己的申报书。其中也写明了申报书里哪些承诺**被超额完成**、
 > 以及哪一处承诺**当时并不成立、已修复**。上表每个数字都由仓库内脚本产出：
 > `bash check-all.sh` 可全部重跑（需要联网；差分那一行还需要系统装有 `hunspell` 与
@@ -46,6 +49,7 @@
 
 ## 目录
 
+- [验收指南 9 条速览](#验收指南-9-条速览) —— 评委可先看这一节
 - [为什么做这个](#为什么做这个) —— 这个库填的是生态里的哪个空缺
 - [安装](#安装) 与 [快速开始](#快速开始)（含 `moon.pkg` 写法、[命令行](#命令行)）
 - [实测数据](#实测数据) —— [符合率](#官方语料符合率) ·
@@ -54,6 +58,24 @@
 - [示例](#示例) —— 三个可运行示例
 - [开源合规](#开源合规)
 - [社区文章](#社区文章) · [许可证](#许可证)
+
+## 验收指南 9 条速览
+
+> 赛方口径：「审核通过的选手，验收前不需要再提交任何表格，只需保持开发，对应开发内容上传
+> 到 Github 即可。」下面逐条给出**可核验的证据**；完整自检（含每一处的文件与命令）
+> 见 [`ACCEPTANCE.md`](ACCEPTANCE.md) §三。
+
+| # | 验收指南 | 我们的情况 |
+|---|---|---|
+| 1 | 项目以 **MoonBit 为主要实现语言**，`moonc` 不低于 **0.10.14** | ✅ `moonc 0.10.14+7d59c7ec9`；`src/` **六个库包全部是 MoonBit，零 `extern`**；仓库内唯一 C 是 CLI 的 native-only 46 行 stdin 垫片 |
+| 2 | GitHub 仓库**公开**、**提交记录清晰** | ✅ [公开仓库](https://github.com/Careylq/spell.mbt)；提交按功能分组，每条说明**改了什么、为什么、怎么验证**；[`DEVLOG.md`](DEVLOG.md) 逐条记录设计取舍 |
+| 3 | 源代码**结构清晰**，能完成**声明的核心功能** | ✅ `aff` → `dic`/`affix` → `spell` → `suggest` → `api` 单向依赖无环；申报书声明逐条对照见 [`ACCEPTANCE.md`](ACCEPTANCE.md) §五（其中两项**超额完成**） |
+| 4 | 提供 **README**：项目目标 / 安装 / 使用 / 示例，并**可复现** | ✅ 本文件 + [英文版](README.mbt.md)；语料**钉在 tag `v1.7.4`**，每条命令的前提条件列在 [`ACCEPTANCE.md`](ACCEPTANCE.md#八如何复现) §八；安装与最小用例已按**全新消费者项目**实测 |
+| 5 | 使用**持续集成**并覆盖**检查、构建、测试** | ✅ [`.github/workflows/ci.yml`](.github/workflows/ci.yml) **11 个声明步骤**：`moon check` / `build` / `test --target all` / 跨后端构建 / 符合率报告 + **两个阻塞式门禁** |
+| 6 | 提供**至少一个可运行示例** | ✅ **三个**：[`examples/basic`](examples/basic)（含 `demo.sh`）· [`examples/doccheck`](examples/doccheck) · [`examples/ci-gate`](examples/ci-gate) |
+| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ `moon test --target all` → **206** 个（wasm / wasm-gc / js）· **210** 个（native），四后端全通过；测试代码 3,692 行 |
+| 8 | **发布到 mooncakes.io** | ✅ [Careylq/spell](https://mooncakes.io/docs/Careylq/spell)：**15 个版本**，最新 `0.9.6`，`build_status: success` |
+| 9 | 采用 **OSI 认可**的许可证；参考/移植须符合原项目许可证 | ✅ **Apache-2.0**；[`NOTICE`](NOTICE) 列明参考范围、Hunspell 的**三许可**，并**主动披露**测试夹具与上游的少量逐行重合及判断依据 |
 
 ## 为什么做这个
 
@@ -223,7 +245,7 @@ wasm 产物 142 KiB 且**无 C++ 运行时**。
 
 ### 工程质量
 
-**200 个测试**（native **204 个**）× 四后端全通过 · `moon check --deny-warn --target all`
+**206 个测试**（native **210 个**）× 四后端全通过 · `moon check --deny-warn --target all`
 0 warning · `moon fmt --check` 干净 · `moon info` 的 `.mbti` diff 为空 ·
 `docs/MOONBIT_GOTCHAS.md` 收录 **43 条**由编译器/运行时验证的 MoonBit 坑。
 

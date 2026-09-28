@@ -39,7 +39,7 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 | 4 | 提供 **README**：项目目标 / 安装方式 / 使用方法 / 示例 / **可复现** | ✅ | [`README.mbt.md`](README.mbt.md)（英文，权威）+ [`README.zh.mbt.md`](README.zh.mbt.md)（中文）；两版都是 `.mbt.md`，代码块受 `moon check` 编译。含安装（含 `moon.pkg` 写法）、Quick start、CLI、以及一条命令的全量复现 |
 | 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) **11 个声明步骤**（GitHub UI 显示为 14，含 `Set up job` / `Post Checkout` / `Complete job`）：`moon check` / `build` / `test --target all` / 跨后端构建 / 符合率报告 / **本仓库自身文档的拼写门禁** / 退出码契约自检。另有手动触发的 `bench.yml` |
 | 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ | 三个：[`examples/basic`](examples/basic)（`moon run examples/basic` 直接跑）· [`examples/doccheck`](examples/doccheck)（用本库检查本仓库文档）· [`examples/ci-gate`](examples/ci-gate)（**离线**证明退出码可作 CI 门禁） |
-| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **200 个测试**（native **204 个**），四后端全通过；测试代码 **3,578 行**；另有官方语料框架 `conformance/` |
+| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **206 个测试**（native **210 个**），四后端全通过；测试代码 **3,692 行**；另有官方语料框架 `conformance/` |
 | 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.9.6`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
 | 9 | 采用 **OSI 认可的开源许可证** | ✅ | [`LICENSE`](LICENSE) = Apache-2.0（OSI 认证） |
 | 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | [`NOTICE`](NOTICE)：参考 Hunspell（**三许可 MPL-1.1 / GPL-2.0 / LGPL-2.1**，按最保守的 LGPL-2.1 判断）与 Aspell 的**格式规范与可观察行为**，未复制源码；测试语料与词典**不随仓库分发**，运行时拉取且**钉 tag `v1.7.4`** |
@@ -99,7 +99,7 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 | 4 | 提供 **README**，说明**项目目标、安装方式、使用方法、示例**，并**可复现** | ✅ [`README.mbt.md`](README.mbt.md)（+ 中文版）含 Goal / Install / Quick start / Examples，顶部有「For reviewers」速览与**目录**；可复现性：语料**钉 tag `v1.7.4`**、每条命令的**前提条件逐条列表**（[§八](#八如何复现)）、`check-all.sh` 一条命令重跑；安装与最小用例已按**全新消费者项目**实测（`moon new` → `moon add Careylq/spell` → 照抄文档即跑通） |
 | 5 | 使用**持续集成**工具并且覆盖**检查、构建、测试**流程 | ✅ [`.github/workflows/ci.yml`](.github/workflows/ci.yml) **11 个声明步骤**（GitHub UI 显示 14）：`moon check` → `moon build` → `moon test --target all` → 跨后端 check/build → 符合率报告 → **本仓库自身文档的拼写门禁**（阻塞）→ **退出码契约自检**（阻塞）。当前 HEAD 全绿 |
 | 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ **三个**：`examples/basic`（内嵌自写词典的完整示例）、`examples/doccheck`（把本库当 CI 门禁用，吃自己狗粮）、`examples/ci-gate`（**离线**断言退出码契约的五用例）。另有 README 的 Quick start 与 `mbt check` 文档测试 |
-| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ `moon test --target all` → **200 个测试**（native **204 个**），**四后端全通过**；测试代码 3,578 行，含反例与错误分支。**本轮补上了审计发现的测试空白**：`ICONV`/`OCONV`（此前**零测试**）、`src/api` 的元数据访问器、CLI 参数解析、`KEY` 邻接排序、无 `TRY` 时的回退。另有 `conformance/` 的官方语料框架作为外部对照 |
+| 7 | 提供**完整测试，覆盖核心功能路径** | ✅ `moon test --target all` → **206 个测试**（native **210 个**），**四后端全通过**；测试代码 3,692 行，含反例与错误分支。**本轮补上了审计发现的测试空白**：`ICONV`/`OCONV`（此前**零测试**）、`src/api` 的元数据访问器、CLI 参数解析、`KEY` 邻接排序、无 `TRY` 时的回退。另有 `conformance/` 的官方语料框架作为外部对照 |
 | 8 | **发布到 mooncakes.io** | ✅ https://mooncakes.io/docs/Careylq/spell —— **15 个版本**（0.1.0 → 0.9.6），最新版 `build_status: success` |
 | 9 | 采用 **OSI 认可**的开源许可证；如**参考或移植**其他开源项目，应符合原项目许可证要求 | ✅ **Apache-2.0（OSI 认可）**。参考 Hunspell 与 Aspell 的**格式规范与公开行为**，未复制其实现代码；[`NOTICE`](NOTICE) 列明参考范围、Hunspell 的**三许可**（MPL-1.1 / GPL-2.0 / LGPL-2.1，按最保守的 LGPL-2.1 判断）、依赖 `moonbitlang/x` 的 Apache-2.0，并**主动披露**测试夹具与上游的少量逐行重合及判断依据 |
 
@@ -112,7 +112,7 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 | 维度 | 结论 | 证据 |
 |---|---|---|
 | **项目完成度** | Hunspell `.aff`/`.dic` 的**解析 → 词缀推导 → 判定 → 建议**全链路打通。官方语料 `.good` **99.2%**、`.wrong` **99.7%**；真实词典上与 C++ Hunspell 判定基本一致（235,976 词上分歧 **0.084%**） | [§六](#六已实测指标每条都可用仓库内脚本复现) |
-| **代码质量** | **200 / 204** 个测试 × 四后端全通过；`moon check --deny-warn --target all` **0 warning**；`moon fmt --check` 干净；`.mbti` 公开接口 diff 为空；CI 全绿（11 个声明步骤）；每个实测数字都有脚本，且**每个未通过用例都逐条列明并解释为什么不猜** | `check-all.sh`；[README](README.md#conformance) |
+| **代码质量** | **206 / 210** 个测试 × 四后端全通过；`moon check --deny-warn --target all` **0 warning**；`moon fmt --check` 干净；`.mbti` 公开接口 diff 为空；CI 全绿（11 个声明步骤）；每个实测数字都有脚本，且**每个未通过用例都逐条列明并解释为什么不猜** | `check-all.sh`；[README](README.md#conformance) |
 | **开源合规性** | Apache-2.0；`NOTICE` 声明参考范围并隔离 LGPL-2.1；语料与词典不分发；依赖唯一且为纯 MoonBit | [`NOTICE`](NOTICE)；[§二](#二章程第七章开源与成果提交要求10-条) |
 | **与 MoonBit 生态的相关性** | 本项目 0.1.0 于 **2026-09-22** 发布，当时以 `hunspell`/`spell`/`affix`/`stemmer`/`snowball`/`hyphenation`/`thesaurus` 检索 mooncakes.io 均为 0 命中；**此后同赛道出现了另一个包**（`wccerty/moonspell`，2026-09-27 首发），已在 README 里如实写明并给出可核验的差异数据；此外四后端可用、公开 API 全部带 `///` 文档、可直接 `moon add`，并有**吃自己狗粮**的 `doccheck` | [README · Ecosystem relevance](README.md#ecosystem-relevance) |
 
@@ -246,8 +246,8 @@ ALL-CAPS 输入匹配混合大小写词条（6 个判定、4 个不同拼写：`
 | 指标 | 本库 | Hunspell 1.7.3 | 倍数 |
 |---|---|---|---|
 | 进程启动 | 0.0020 s | 0.0030 s | 0.67×（略快） |
-| 词典加载（49,568 词条） | 0.030 s | 0.007 s | 慢 4.29× |
-| **直接命中，仅查找** | **0.32–0.38 µs/词** | 0.36–0.38 µs/词 | **0.84×–1.06×（跨过 1.0，即持平）** |
+| 词典加载（49,568 词条） | 0.029–0.030 s | 0.006–0.007 s | 慢 4×–5× |
+| **直接命中，仅查找** | **0.32–0.38 µs/词** | 0.36–0.40 µs/词 | **0.80×–1.06×（跨过 1.0，即持平）** |
 | 235,976 词混合（18.4% 命中） | 1.84 s | 0.29 s | 慢 6.37× |
 | 未命中，仅查找 | 9.2–9.8 µs/词 | 1.49–1.57 µs/词 | 慢 5.9×–6.6× |
 
@@ -255,10 +255,10 @@ ALL-CAPS 输入匹配混合大小写词条（6 个判定、4 个不同拼写：`
 后缀规则、前缀规则、前缀×后缀叉积和双后缀族全试一遍）与**词典加载**；**直接查表已与
 Hunspell 持平**。这两点就是明确、可验证、可排期的优化目标。
 
-> 区间而非单值：重复运行同一脚本时，直接命中这一行**会跨过 1.0**（观测到 0.84× 与 1.06×
-> ——同一份代码跑出相反的结论），未命中这一行在 **5.9×–6.6×** 之间摆动。**每次重跑都在
-> 把区间拉宽而不是收窄**，所以这里主张的是**形状**：命中持平、未命中约 6×、加载约 4×；
-> 需要具体比值就现场重跑，不要引用这里的某一个数。这也正是本项目把「重测」写进流程的原因。
+> 区间而非单值：重复运行同一脚本时，直接命中这一行**会跨过 1.0**（观测到 0.80× 与 1.06×
+> ——同一份代码跑出相反的结论），未命中在 **5.9×–6.6×** 之间摆动，词典加载在 **4×–5×** 之间。
+> **到目前为止每次重跑都在把区间拉宽而不是收窄**，所以这里主张的是**形状**：命中持平、
+> 未命中约 6×、加载 4–5×；需要具体比值就现场重跑，不要引用这里的某一个数。这也正是本项目把「重测」写进流程的原因。
 
 ### 6.5 产物体积
 
@@ -361,7 +361,7 @@ bash check-all.sh
 
 # 或分别运行
 moon check --deny-warn --target all   # 0 error, 0 warning
-moon test  --target all               # 200 / 204，四后端
+moon test  --target all               # 206 / 210，四后端
 moon fmt --check && moon info         # 格式干净；.mbti diff 为空
 bash conformance/run.sh               # 官方语料符合率
 bash conformance/suggest.sh           # .sug 建议质量
@@ -391,7 +391,7 @@ moon run examples/basic               # 可运行示例
 
 - [x] `moon check --deny-warn --target all` 无错误、无警告
 - [x] `moon build` 通过（wasm / wasm-gc / js / native 四后端 release 均成功）
-- [x] `moon test --target all` 全部通过（200 / 200 / 200 / 204）
+- [x] `moon test --target all` 全部通过（206 / 206 / 206 / 210）
 - [x] `moon fmt --check` 干净；`moon info` 的 `.mbti` diff 为空
 - [x] CI 全步骤 success（11 个声明步骤，含两步阻塞式门禁）
 - [x] README 与本文的数字全部是**实测**的，且由 `check-all.sh` 可复现

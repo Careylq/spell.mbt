@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml/badge.svg)](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml)
 
+**English** (this file) · [**中文**](README.zh.md) — 中文说明是精简版；完整表格、逐条未实现清单与
+可复现命令以本文件为准。
+
 A pure-MoonBit spell checker compatible with the **Hunspell `.aff` / `.dic` dictionary
 format** — it parses real-world dictionaries (e.g. `en_US`), applies the affix rules
 defined in the `.aff` file, judges words the way Hunspell does, and suggests corrections
@@ -14,16 +17,17 @@ for the words it rejects.
 > |---|---|
 > | Conformance (official Hunspell corpus, corpus pinned to tag `v1.7.4`) | `.good` **847/854 = 99.2%** · `.wrong` **611/613 = 99.7%** |
 > | Differential test vs hunspell 1.7.3 | 235,976 real words: **199 disagreements = 0.084%** |
-> | Tests | **200** (wasm / wasm-gc / js) · **204** (native) |
+> | Tests | **206** (wasm / wasm-gc / js) · **210** (native) |
 > | Direct lookup vs hunspell | **parity** (0.32–0.38 vs 0.36–0.38 µs/word; the ratio crosses 1.0 both ways) |
 > | wasm artifact | **142.2 KiB**, with no C++ runtime |
 >
 > [`ACCEPTANCE.md`](ACCEPTANCE.md) is the requirement-by-requirement self-check against all
 > five acceptance yardsticks — charter stage three (9 items), charter chapter seven (10
-> items), the website's 6 standards, the organisers' 4 review dimensions, and this project's
-> own proposal. It also names which proposal commitments were **exceeded** and which single
-> commitment turned out to be **untrue and was fixed**. Every figure above comes from a
-> script in this repository: `bash check-all.sh` re-runs all of them (it needs network, and a
+> items), **the organisers' acceptance guide (9 items)**, the organisers' 4 review
+> dimensions, and this project's own proposal. It also names which proposal commitments were
+> **exceeded** and which single commitment turned out to be **untrue and was fixed**. Every
+> figure above comes from a script in this repository: `bash check-all.sh` re-runs all of them
+> (it needs network, and a
 > system `hunspell` plus `/usr/share/dict/words` for the differential row — the per-command
 > prerequisites are tabulated in [`ACCEPTANCE.md`](ACCEPTANCE.md#八如何复现) §八).
 
@@ -246,14 +250,14 @@ is only 18.4% hits. **The miss path and dictionary load are the optimisation
 targets; direct lookup is already at parity.**
 
 > **Run-to-run range, so no single ratio is over-read.** Repeated `bash bench/run.sh`
-> runs on this machine have put the direct-hit row between **0.84× and 1.06×** — that is,
-> **on both sides of parity** (ours 0.32–0.38 µs/word, hunspell 0.36–0.38) — and the
-> all-miss row between **5.9× and 6.6×** (ours 9.2–9.8 µs/word, hunspell 1.49–1.57). Each
-> re-run has widened the range rather than narrowing it, which is why this section claims
-> **the shape, not a decimal**: hits are at parity, misses are *about six times* slower,
-> dictionary load *about four times*. The table above is one run — not the best one, and
-> not a claim about the code's ratio. **If you need a ratio for a decision, re-run the
-> harness; do not lift one from here.**
+> runs on this machine have put the direct-hit row between **0.80× and 1.06×** — that is,
+> **on both sides of parity** (ours 0.32–0.38 µs/word, hunspell 0.36–0.40) — the all-miss
+> row between **5.9× and 6.6×** (ours 9.2–9.8 µs/word, hunspell 1.49–1.57), and dictionary
+> load between **4× and 5×**. **Every re-run so far has widened these ranges rather than
+> narrowing them**, which is why this section claims **the shape, not a decimal**: hits are
+> at parity, misses are *about six times* slower, load *four to five times*. The table
+> above is one run — not the best one, and not a claim about the code's ratio. **If you
+> need a ratio for a decision, re-run the harness; do not lift one from here.**
 
 As a cross-backend data point on the same 235,976 words: native release 1.840 s
 is **2.25×** faster than release wasm (4.146 s) and **2.51×** faster than the
@@ -826,7 +830,7 @@ cannot drift away from the code.
 
   (Chinese. Every measured number in it was taken from this repository, but some have
   moved since publication: the article and the cover say **178 / 182** tests, and the
-  repository now has **200 / 204**. The increments come from two sources. First, `mbt check`
+  repository now has **206 / 210**. The increments come from two sources. First, `mbt check`
   blocks added to the Quick start above and to `README.zh.mbt.md`: a block containing a
   `test` is executed by `moon test`, so documenting a behaviour now enforces it. Second,
   tests added after an independent audit found features this README *claimed* while nothing
