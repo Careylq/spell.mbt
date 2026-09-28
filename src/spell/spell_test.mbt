@@ -1,7 +1,12 @@
 // Blackbox tests for the public `@spell` API.
 //
-// Every fixture below is written from scratch for this project; no Hunspell test
-// data is copied (Hunspell is LGPL-2.1, this project is Apache-2.0).
+// The fixtures below were written for this project. They are not guaranteed to be
+// free of upstream overlap, and an audit found some that is: of the 374 `#|` fixture
+// lines here in total, 70 are byte-identical to a line in Hunspell's `tests/` that
+// does not also appear in `hunspell(5)` — mostly single directive lines (a flag letter
+// is the only free choice) and a few sample words. No corpus *file* is redistributed;
+// see NOTICE, "关于测试夹具", for the method and the judgement.
+// (Hunspell is tri-licensed MPL-1.1/GPL-2.0/LGPL-2.1; this project is Apache-2.0.)
 
 ///|
 /// Build a dictionary, turning an unexpected `SpellError` into a test failure.

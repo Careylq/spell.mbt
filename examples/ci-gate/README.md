@@ -72,6 +72,9 @@ jobs:
             echo "::warning::could not obtain the dictionary; doccheck was skipped"
             exit 0
           fi
+          if [ "$rc" != "0" ]; then
+            echo "::error::doccheck exited $rc"
+          fi
           exit "$rc"
 ```
 
@@ -104,8 +107,9 @@ bash examples/doccheck/run.sh            # see what it flags
 ```
 
 The numbers from doing exactly that on this repository are in
-[`examples/README.md`](../README.md#examplesdoccheck): the first run flags **118 distinct
-words**, **none of which is a real typo**, and the allowlist brings it to **0**.
+[`examples/README.md`](../README.md#examplesdoccheck): the first run flags **128 distinct
+words** (a count that grows with the prose, so it is not pinned), **none of which is a real
+typo**, and the allowlist brings it to **0**.
 
 **`cmd/main check` is not the gate, and that is on purpose.** It prints one verdict per
 input line (`1` correct, `0` incorrect) and exits `0` even when a word is rejected, because

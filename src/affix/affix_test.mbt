@@ -1,8 +1,9 @@
 // Blackbox tests for the public `@affix` API.
 //
 // The rule table is derived from the *shapes* of rules found in real `en_US`
-// affix files; the dictionaries here are written from scratch. No test data
-// from the Hunspell repository is copied.
+// affix files; the dictionaries here are written from scratch. An audit of all
+// fixtures found no upstream line overlap in this file; overlap does exist in
+// others — see NOTICE, "关于测试夹具".
 
 ///|
 /// Build an `AffixRule` with the fields under test; flag and morphological data

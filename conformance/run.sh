@@ -10,6 +10,7 @@
 # Usage:
 #   bash conformance/run.sh                       # clone the corpus to a temp dir
 #   HUNSPELL_DIR=/path/to/hunspell bash conformance/run.sh
+#   HUNSPELL_REF=v1.7.3 bash conformance/run.sh      # pin a different corpus release
 #   CONFORMANCE_REQUIRE_CLI=1 bash conformance/run.sh   # fail instead of skipping
 #
 # Exit status:
@@ -81,8 +82,15 @@ if [ -n "${HUNSPELL_DIR:-}" ]; then
 else
   TMP="$(mktemp -d)"
   CLEANUP="$TMP"
-  echo "Cloning hunspell test corpus into $TMP ..."
-  if ! git clone --depth 1 --quiet https://github.com/hunspell/hunspell "$TMP/hunspell"; then
+  # The corpus is PINNED. Upstream master moves, and a new upstream suite silently
+  # changes every absolute count this project publishes: on 2026-09-28 master had
+  # gained `compoundaffixmorph` (6 .good lines, all passing here), which moved the
+  # total from 848 to 854 without changing the pass rate. Pinning the tag keeps the
+  # numbers in README.mbt.md reproducible instead of merely once-true.
+  CORPUS_REF="${HUNSPELL_REF:-v1.7.4}"
+  echo "Cloning hunspell test corpus ($CORPUS_REF) into $TMP ..."
+  if ! git clone --depth 1 --quiet --branch "$CORPUS_REF" \
+       https://github.com/hunspell/hunspell "$TMP/hunspell"; then
     echo "ERROR: could not clone the corpus. Set HUNSPELL_DIR to a local checkout." >&2
     exit 1
   fi

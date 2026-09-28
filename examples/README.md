@@ -10,8 +10,9 @@ from the repository root.
 moon run examples/basic
 ```
 
-It embeds a tiny `.aff` + `.dic` pair (written from scratch for this project —
-no Hunspell test data is copied) and then:
+It embeds a tiny `.aff` + `.dic` pair, written from scratch for this project (the same
+audit that found overlap elsewhere confirmed this one is self-written — see
+[`NOTICE`](../NOTICE)), and then:
 
 1. loads the dictionary once with `@spell.load`,
 2. prints the detected `SET` encoding, the `FLAG` mode, the number of affix
@@ -108,18 +109,18 @@ is not clean, and the numbers below are from actual runs, not estimates.
 
 | run | files scanned | distinct words flagged | misspelled tokens |
 |---|---|---|---|
-| first run, no allowlist | 34 | **118** | see the note |
-| after `allowlist.txt` (109 entries) | 34 | **0** | **0** |
+| first run, no allowlist | 34 | **128** | see the note |
+| after `allowlist.txt` | 34 | **0** | **0** |
 | `--include-tests` (allowlist on) | 46 | 10 | 13 |
 
-The word and token **totals** are not quoted: they grow with this repository's own prose,
-so pinning them guaranteed they went stale on the next sentence (the tree carried ~18,300
-words at 0.9.2 and ~20,000 now). What the claim rests on is the pair of stable numbers —
-**118 distinct words flagged, none of them a real typo** — and re-running the command
-prints the current totals.
+The word and token **totals** are not quoted, and neither is the flagged-word count: all
+three grow with this repository's own prose, so pinning them guaranteed they went stale on
+the next sentence (the tree carried ~18,300 words at 0.9.2 and ~21,700 now, and the flagged
+count moved with it — **118 → 128**). What the claim rests on is the one thing re-checked on
+every run: **none of the flagged words is a real typo.**
 
-All 118 distinct words the first run flagged were reviewed by hand: **none was a
-typo.** 118 of 118 were false positives of a general dictionary on a technical
+All 128 distinct words the first run flagged were reviewed by hand: **none was a
+typo.** Every one was a false positive of a general dictionary on a technical
 repository — project vocabulary (`wasm`, `stdin`, `backend`, `aff`, `dic`), the
 Hunspell/affix terminology this project is about (`Fuge`, `endchars`,
 `circumfix`, `ngram`, `checksharps`), MoonBit and third-party proper nouns
@@ -129,7 +130,7 @@ ordinary English words a size-60 SCOWL list simply omits (`seekable`, `runnable`
 `matcher`, `lookups`, `substring`, `unclosed`, `misclassifies`). They are all in
 the allowlist.
 
-With `--include-tests` the remaining 11 are the deliberate fixtures and suffix
+With `--include-tests` the remaining 10 are the deliberate fixtures and suffix
 fragments in test comments (`abc`, `aeiou`, `krom`, `sxzh`, `-ication`, ...);
 that is exactly why the default scope leaves test files out.
 

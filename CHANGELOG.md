@@ -15,6 +15,78 @@ minor versions may still change behaviour.
   Every prose edit moved it by a word or two and forced a numbers update; an exact count is
   not the claim — the flagged-token and distinct-word columns are.
 
+### Fixed — claims that an independent audit could falsify
+
+Four independent audits were run on 2026-09-28 (one adversarial reviewer, one independent
+re-measurement of every published number, one MoonBit code review, one licence audit). Every
+item below was reproduced by hand before being changed. **No library code changed in this
+release**; the engine's measured behaviour is identical.
+
+- **The `Why` section claimed the registry had no spell-checking library, in the present
+  tense.** False since 2026-09-27, when `wccerty/moonspell` was published. `README.mbt.md`
+  and `README.zh.mbt.md` now date the claim to the proposal, name the other package, and say
+  what this one verifiably does instead — a comparison table, not a denial.
+- **The differential test's error direction was stated backwards in four files.** The 198
+  disagreements are words *Hunspell rejects and this library accepts* — this library is the
+  **more permissive** side — but `README.mbt.md`, `README.zh.mbt.md`, `ACCEPTANCE.md` and
+  `conformance/README.md` all described them as forms *Hunspell reaches* that this library
+  does not cover. The script's own output line (`FALSE ACCEPTS (we accept, they reject)`) had
+  been right the whole time.
+- **Test-fixture provenance was overstated.** Four files said fixtures were written from
+  scratch and that no Hunspell test data is copied. An audit matched every `#|` line against
+  upstream `tests/`: 70 lines are byte-identical to an upstream line that is *not* in
+  `hunspell(5)` — including one 8-line block identical and in the same order as
+  `tests/flag.aff`. `NOTICE` now discloses this with a reproducible method and a stated
+  judgement, and the four files point at it instead of asserting provenance.
+- **The official corpus was not pinned**, so every absolute conformance count in the docs
+  was unreproducible: upstream gained a 6-line suite on 2026-09-28 and the total moved
+  848 → 854 while the pass rate stayed 99.2%. `conformance/run.sh` and `suggest.sh` now pin
+  the tag `v1.7.4` (`HUNSPELL_REF=` overrides), and the numbers are the pinned ones
+  (**847/854** `.good`, 155 suites).
+- **`NOTICE` was imprecise in five places**: Hunspell is tri-licensed (MPL-1.1 / GPL-2.0 /
+  LGPL-2.1), not LGPL-2.1 alone; `doccheck` *caches* the dictionary rather than deleting it,
+  so "用完即删" was wrong for one of four scripts; it pointed at "各词典目录下的说明" that do
+  not exist; the dependency was not named or licensed; and Aspell — whose `PHONE` rule
+  language Hunspell borrowed — was not listed as a reference at all.
+- **`ACCEPTANCE.md` cited `Careylq/spell@0.9.5`** as the published artifact while `moon.mod`
+  and both READMEs said 0.9.6 → corrected to 0.9.6.
+- **`README.mbt.md` contradicted itself on the wasm artifact**: 142.2 KiB in two places and
+  "~103 KiB" in the ecosystem section → 142.2 KiB throughout.
+- **"No template residue" was false.** `.github/workflows/copilot-setup-steps.yml` and
+  `.githooks/` are byte-identical to a fresh `moon new`; they are now recorded as
+  **deliberately retained** rather than as an absence. The same line cited
+  `.githooks/pre-commit` as evidence of development history while `core.hooksPath` was never
+  set, so the hook has never run — the file now says it is opt-in.
+- **`bench/README.md` contained two mutually exclusive sets of measurements**, one paragraph
+  claiming hand-recorded figures "reproduce as 0.153 s / 0.187 s" next to a results table
+  giving 0.1980 / 0.2020 s. The paragraph is gone; the tables are this machine's current run.
+- **A statistic was used as a premise with no citation.** "LLMs score 0–1% zero-shot on
+  MoonBit (an IEEE TSE paper)" now cites the paper by name and arXiv id
+  ([arXiv:2606.16827](https://arxiv.org/abs/2606.16827)) and stops attributing the specific
+  number to it, because the paper's abstract does not contain it.
+- **`ACCEPTANCE.md`'s reproduction section overstated what one command needs**: the
+  differential and benchmark scripts also require a system `hunspell` and
+  `/usr/share/dict/words`, so `check-all.sh` cannot complete on a bare Linux image. The
+  prerequisites are now tabulated per command.
+- **The section that cross-checks the proposal quoted a document that is not in the
+  repository.** It now says so, and states that the table is a restatement rather than a
+  citation.
+
+### Added
+
+- **Six behavioural deviations found by that audit are now disclosed** in both `README.mbt.md`
+  ("Not implemented yet") and `ACCEPTANCE.md` §7.2, with the command that establishes each:
+  multi-separator numbers (`1.2.3`), the compound-part limit falling back to 8, the scope of
+  `CHECKCOMPOUNDTRIPLE`, `PHONE` digit priorities being parsed but never read, `AM` aliases
+  parsed but never consumed, and the CLI's UTF-8 sniffer accepting overlong encodings and
+  surrogates. They are **disclosed rather than fixed**: none appears on the official corpus,
+  and changing verified engine code days before a snapshot was judged the larger risk.
+- **The one test that encodes a bug is named as such** in the README: `spell_test.mbt` asserts
+  `1.2.3` is rejected, which is the behaviour, but Hunspell accepts it — so the assertion is
+  the bug, not the spec, and it is listed for correction rather than quietly left.
+- `.gitignore` now ignores `*.aff` / `*.dic` / `*.good` / `*.wrong` / `*.sug` as a safety net,
+  in case someone points `SPELL_DICT_DIR` or `HUNSPELL_DIR` at the working tree.
+
 ## [0.9.6] — 2026-09-27
 
 Documentation, repository hygiene and CI. No library code or interface change.
@@ -127,7 +199,7 @@ Documentation only. No code, test or interface change.
   README, with the note that where the article and this repository disagree, the
   repository and the scripts that produce it win.
 
-
+## [0.9.3] — 2026-09-27
 
 Documentation only. No code, test or interface change.
 
@@ -138,7 +210,7 @@ Documentation only. No code, test or interface change.
   labeled as such, because the word count necessarily grows with the repository's own
   prose and would otherwise be invalidated by every future edit.
 
-
+## [0.9.2] — 2026-09-27
 
 Makes the dogfooding example's exit code usable as a CI gate. Library code is
 untouched, so conformance and benchmark numbers cannot change and were not re-run.
@@ -162,7 +234,7 @@ library CLI (`cmd/main check`) deliberately still exits `0` on a rejected word: 
 reports one verdict per line, and the conformance and benchmark harnesses read that
 stream and would break if a rejected word failed the process. Gating is `doccheck`'s job.
 
-
+## [0.9.1] — 2026-09-27
 
 Measurement correction, two performance fixes, and tests for a previously untested
 function. **No spelling judgement changed** — confirmed by the full suite, the full

@@ -116,13 +116,16 @@ built with `moon build --target native --release`. Section 2 therefore reports
 `moon run --release` path side by side, and section 3 adds release wasm to the
 cross-backend comparison so the wasm backend is never understated.
 
-That distinction also reconciles two figures recorded earlier in this project by
-hand: "load + judge the dictionary's own 49,568 entries = 0.15 s" reproduces as
-**0.153 s** on the *release* wasm path, whereas plain `moon run` (debug) is
-**0.187 s**; likewise "/usr/share/dict/words = 3.80 s" sits within 1% of the
-release-wasm **3.837 s** here, while debug wasm is 4.353 s. Both pairs are the
-same workloads; neither figure replaces the other, and this harness reports both
-rather than picking whichever looks better.
+Two figures were recorded by hand **earlier in this project's history** and do
+*not* appear in the tables below: "load + judge the dictionary's own 49,568
+entries = 0.15 s" and "/usr/share/dict/words = 3.80 s". They are not comparable
+with the current tables, and this harness deliberately does not claim to
+"reconcile" them, because two things changed in between: the code (0.9.1 fixed two
+hot-path allocation regressions, which is why the current miss path is measured in
+µs/word at all) and the machine's OS (26.6.2 → 26.7). **The tables in this file are
+the record; the older hand-written figures are superseded.** If you want them
+compared, re-run the harness — do not quote both sets as if one confirmed the
+other.
 
 ### Real dictionary (sections 1–3)
 
@@ -270,7 +273,7 @@ One real run, `bash bench/run.sh`, **2026-09-27T07:35:54Z**.
 Machine / toolchain (printed by the script itself):
 
 ```
-os        : macOS 26.6.2 (25G83) arm64, kernel 25.6.0
+os        : macOS 26.7 (25G229) arm64, kernel 25.6.0
 cpu       : Apple M5 (10 cores)
 memory    : 16 GiB
 toolchain : moon 0.1.20260920, moonc v0.10.14+7d59c7ec9, moonrun 0.1.20260920
@@ -288,24 +291,25 @@ Command shape: `moon run cmd/main -- check --aff en_US.aff --dic en_US.dic --wor
 
 | step | wasm debug (`moon run`) | wasm release (`moon run --release`) |
 |---|---|---|
-| process start (no-arg run) | 0.0190 s | 0.0210 s |
-| start + load (empty word list) | 0.1390 s | 0.1120 s |
-| **load only** (derived) | **0.1200 s** | **0.0910 s** |
-| 1-word run (2-point cross-check) | 0.1400 s | 0.1150 s |
-| 49,568-word run, all hits | 0.2020 s | 0.1980 s |
-| **checking only** (derived) | **0.0630 s** | **0.0860 s** |
-| per-word checking cost | 1.27 µs | 1.73 µs |
-| throughput, end-to-end | 245,386 words/s | 250,343 words/s |
-| throughput, checking only | 786,794 words/s | 576,372 words/s |
+| process start (no-arg run) | 0.0210 s | 0.0210 s |
+| start + load (empty word list) | 0.1390 s | 0.1190 s |
+| **load only** (derived) | **0.1180 s** | **0.0980 s** |
+| 1-word run (2-point cross-check) | 0.1390 s | 0.1170 s |
+| 49,568-word run, all hits | 0.1970 s | 0.1640 s |
+| **checking only** (derived) | **0.0580 s** | **0.0450 s** |
+| per-word checking cost | 1.17 µs | 0.91 µs |
+| throughput, end-to-end | 251,614 words/s | 302,244 words/s |
+| throughput, checking only | 854,621 words/s | 1,101,511 words/s |
 
-2-point cross-check: debug `0.1210 s` vs `0.1200 s`; release `0.0940 s` vs
-`0.0910 s`.
+2-point cross-check: debug `0.1180 s` vs `0.1180 s`; release `0.0960 s` vs
+`0.0980 s`.
 
-The two end-to-end totals are within 1.5% of each other (0.2020 s vs 0.1980 s), so
-the split of that total into "load" and "checking" is dominated by run-to-run noise
-in the empty-word-list point it is derived from. The release column loading faster
-(0.0910 s vs 0.1200 s) while appearing to check slower is an artefact of that
-subtraction, not a real effect.
+In this run release is ahead on both ends. That is the expected direction but it is
+worth recording that **an earlier run of this same harness had the two columns
+reversed on the checking row** (release appearing *slower*): the "checking" figure is
+derived by subtracting an empty-word-list measurement that carries process-start
+noise, so a reversal there is an artefact of the subtraction, not a real effect. Treat
+the two columns as one backend compiled two ways in one run, not as a stable order.
 
 Self-check: **49,565/49,568** entries accepted; the 3 rejected (`1th 2th 3th`)
 all carry the `.aff` `ONLYINCOMPOUND` flag `c`, i.e. the rejection is correct and
@@ -318,16 +322,16 @@ is *derived* from the dictionary rather than hard-coded.
 | process start | 0.0020 s | 0.0030 s | 0.67× |
 | start + load | 0.0320 s | 0.0100 s | 3.20× |
 | load only | 0.0300 s | 0.0070 s | 4.29× |
-| 49,568 **hits**: total | 0.0510 s | 0.0280 s | 1.82× |
-| 49,568 hits: checking only | 0.0190 s | 0.0180 s | 1.06× |
-| 49,568 hits: per word | 0.38 µs | 0.36 µs | 1.06× |
-| 49,568 hits: throughput (e2e) | 971,922 w/s | 1,770,286 w/s | |
-| 49,568 **misses**: total | 0.5080 s | 0.0840 s | 6.05× |
-| 49,568 misses: checking only | 0.4760 s | 0.0740 s | 6.43× |
-| 49,568 misses: per word | 9.60 µs | 1.49 µs | 6.44× |
-| 49,568 misses: throughput (e2e) | 97,575 w/s | 590,095 w/s | |
-| 235,976 mixed words: total | 1.9100 s | 0.2870 s | 6.66× |
-| 235,976 mixed words: throughput | 123,548 w/s | 822,216 w/s | |
+| 49,568 **hits**: total | 0.0490 s | 0.0280 s | 1.75× |
+| 49,568 hits: checking only | 0.0170 s | 0.0180 s | 0.94× |
+| 49,568 hits: per word | 0.34 µs | 0.36 µs | 0.94× |
+| 49,568 hits: throughput (e2e) | 1,011,592 w/s | 1,770,286 w/s | |
+| 49,568 **misses**: total | 0.5180 s | 0.0840 s | 6.17× |
+| 49,568 misses: checking only | 0.4860 s | 0.0740 s | 6.57× |
+| 49,568 misses: per word | 9.80 µs | 1.49 µs | 6.58× |
+| 49,568 misses: throughput (e2e) | 95,691 w/s | 590,095 w/s | |
+| 235,976 mixed words: total | 1.8400 s | 0.2890 s | 6.37× |
+| 235,976 mixed words: throughput | 128,248 w/s | 816,526 w/s | |
 
 `/usr/share/dict/words` (235,976 words) is **18.4% hits** (43,474 accepted) on
 this dictionary, so it is miss-dominated.
@@ -336,11 +340,13 @@ this dictionary, so it is miss-dominated.
 49,568 words into an all-hit and an all-miss list (verified: 0 of the "+xq"
 misses were accepted) shows:
 
-* on the **hit** path the two engines are level — our checking phase is
-  0.38 µs/word vs hunspell's 0.36 µs/word (1.06×, a gap inside run-to-run
-  variance). Our 1.82× end-to-end gap on that list is almost entirely
-  **dictionary load** (30 ms vs 7 ms, 4.29×), not lookup;
-* on the **miss** path we are 6.4× slower per word (9.60 µs vs 1.49 µs), because
+* on the **hit** path the two engines are level — in this run our checking phase is
+  actually ahead (0.34 µs/word vs hunspell's 0.36 µs/word, 0.94×), and in earlier runs
+  it was behind; either way the gap is inside run-to-run variance. Our end-to-end gap
+  on that list is almost entirely **dictionary load** (30 ms vs 7 ms, 4.29×), not
+  lookup;
+* on the **miss** path we are **6.3–6.6× slower per word** (9.80 µs vs 1.49 µs in this
+  run; the ratio has ranged 6.30×–6.58× across runs and an OS update), because
   `affix_hit` (`src/spell/lookup.mbt`) tries every suffix rule, every prefix
   rule, the prefix×suffix cross product and the two-suffix families for every
   rejected word, while a hit ends at `direct_hit` — one map access.
@@ -353,11 +359,11 @@ scaling curve tests.
 
 | backend | total | throughput |
 |---|---|---|
-| native release | 1.9100 s | 123,548 words/s |
-| wasm release (`moon run --release`) | 4.2010 s | 56,171 words/s |
-| wasm debug (plain `moon run`) | 4.7820 s | 49,347 words/s |
+| native release | 1.8400 s | 128,248 words/s |
+| wasm release (`moon run --release`) | 4.1460 s | 56,917 words/s |
+| wasm debug (plain `moon run`) | 4.6210 s | 51,066 words/s |
 
-Native release is **2.20×** faster than release wasm and **2.50×** faster than
+Native release is **2.25×** faster than release wasm and **2.51×** faster than
 debug wasm on this miss-dominated workload.
 
 ### 4. Scaling curve (synthetic; 100,000-word workload at every size)

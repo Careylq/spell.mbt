@@ -3,8 +3,14 @@
 本文件记录在实现本项目的过程中，**由编译器、warning 或实际运行**验证过的 MoonBit 语法、
 工具链与跨后端行为陷阱。
 
-**为什么值得记录**：LLM 对 MoonBit 的零样本正确率只有 0–1%（IEEE TSE 论文实测），
+**为什么值得记录**：MoonBit 属于 LLM 的 *no-resource language*——几乎没有任何训练数据。
+这一点可引：Giagnorio / Martin-Lopez / Bavota, *No Resource, No Benchmarks, No Problem?
+Evaluating and Improving LLMs for Code Generation in No-Resource Languages*,
+[arXiv:2606.16827](https://arxiv.org/abs/2606.16827)（已被 **IEEE TSE** 接收）。
 所以 AI 生成的 MoonBit 代码"看起来对、实际编译不过"是常态。
+
+> 出处说明：本项目技术文章里引用了其中一个具体数字（MoonBit / Gleam 在 McEval-Hard 上的
+> 零样本 pass@1 为 0–1%）；该数字出自文章，**本文件不作复述**，只以上述论文的定性结论为前提。
 这份清单把踩过的坑固化下来，让后续迭代（以及任何 AI 辅助）不用重复踩。
 
 > 环境：`moon 0.1.20260920`（编译器 v0.10.x），macOS arm64。

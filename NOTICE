@@ -3,37 +3,83 @@
 ## 参考的开源项目
 
 本项目是依据 **Hunspell** 的 `.aff` / `.dic` 文件格式规范与可观察行为**独立实现**的
-MoonBit 拼写检查库。**本项目未复制 Hunspell 的源代码。**
+MoonBit 拼写检查库。**本项目未复制 Hunspell 的实现代码**（"什么算复制"的界定见
+[关于测试夹具](#关于测试夹具一次可复现的审计)）。
 
 | 项目 | 链接 | 许可证 | 本项目参考的范围 |
 |---|---|---|---|
-| Hunspell | https://github.com/hunspell/hunspell | LGPL-2.1 | `.aff` / `.dic` 文件格式；词缀规则（PFX/SFX）语义；特殊 flag 语义；建议结果的可观察行为 |
+| Hunspell | https://github.com/hunspell/hunspell | **MPL-1.1 / GPL-2.0 / LGPL-2.1 三许可**（上游 `README.md` 自述 "LGPL/GPL/MPL tri-license"，源码头部亦如此标注） | `.aff` / `.dic` 文件格式；词缀规则（PFX/SFX）语义；特殊 flag 语义；建议结果的可观察行为 |
+| Aspell | http://aspell.net/ | LGPL-2.1 | **仅** `PHONE` 规则语言。`hunspell(5)` 注明该规则语言是 Hunspell 从 Aspell 借用的；本项目的实现依据是 Aspell 的 "Phonetic Code" 文档，**未参考其代码** |
 
 参考范围说明：
 
 - **仅参考**文件格式规范、规则的语义定义，以及公开可观察的输入/输出行为。
-- **未**复制、翻译或改写 Hunspell 的 C++ 实现代码。
-- 本项目选择 Apache-2.0 许可证。由于未包含 Hunspell 的衍生代码，
-  LGPL-2.1 的传染性条款不适用于本项目源码。
-- 若未来有代码参考自 Hunspell 实现，该部分将单独标注并按 LGPL-2.1 处理。
+- **未**复制、翻译或改写 Hunspell 或 Aspell 的实现代码；库包内没有任何 C / C++ 源码
+  （仓库内唯一的 C 是 `cmd/main/stdin_native.c`，46 行，为原生后端流式读 stdin 而自写）。
+- 本项目选择 **Apache-2.0**。Hunspell 是三许可，本项目按其中**最保守的 LGPL-2.1** 判断义务；
+  由于未包含衍生代码，LGPL-2.1 的传染性条款不适用于本项目源码。
+- 若未来有代码参考自上述实现，该部分将单独标注并按对应许可证处理。
+
+## 关于测试夹具：一次可复现的审计
+
+`src/**/*_test.mbt` 里的夹具（`#|` 块）是**为本项目编写的**。但 2026-09-28 的一次独立审计
+用逐行精确匹配发现：**374 行夹具中有 70 行与上游 `tests/` 中的某一行逐字节相同，
+且这些行不出现在 `hunspell(5)` 手册里**（因此不能以"手册中的格式示例"解释）。
+该审计可复现：
+
+```bash
+git clone --depth 1 --branch v1.7.4 https://github.com/hunspell/hunspell /tmp/hs
+# 然后把本仓库所有 `#|` 行与 /tmp/hs/tests/*.aff|*.dic 的非空行做精确匹配，
+# 再剔除在 /tmp/hs/man/hunspell.5 中出现过的行
+```
+
+这 70 行分三类。本项目的判断是：**第一类属格式词汇、写法上不可避免；第二、三类是极小的
+示例，可版权性很低** —— 因此选择**如实披露**，而不是删改后假装没有重合：
+
+| 类别 | 例子 | 判断 |
+|---|---|---|
+| 指令行（格式词汇 + 一个自选 flag 字母或字符） | `CHECKSHARPS`、`BREAK 0`、`COMPOUNDFLAG C`、`WORDCHARS .` | 除"用哪个 flag 字母"外没有选择空间；属格式规范的必要写法 |
+| 词条行（自选样例词） | `NASA`、`Gandhi`、`phantom`、`rotten`、`which ph:wich` | 单个常用词、专有名词或音似条目；无创作性表达 |
+| 一处同序整块 | `src/spell/spell_test.mbt` 中一处 8 行与 `tests/flag.aff` **同序逐字节相同** | 最接近"复制"的一处；其内容仍是前两类的组合（`SFX A 0 s/123 .` 这类指令行 + `bar`/`baz` 样例词） |
+
+需要强调的是：**没有任何上游语料文件被复制进本仓库。** `git ls-files` 里不存在任何
+`.aff` / `.dic` / `.good` / `.wrong` / `.sug`（唯一的 `.txt` 是本项目自产的
+`examples/doccheck/allowlist.txt`），`git log --all` 显示历史上也从未有过。上游语料一律
+**运行时拉取**。
 
 ## 测试语料
 
-`conformance/` 下的符合率测试使用 Hunspell 官方仓库 `tests/` 目录中的测试语料
+`conformance/` 的符合率与建议质量测试使用 Hunspell 官方仓库 `tests/` 的语料
 （`.aff` / `.dic` / `.good` / `.wrong` / `.sug`，随 Hunspell 以 LGPL-2.1 发布）。
 
-**该语料不随本仓库分发。** 符合率脚本在 CI 运行时将其克隆到临时目录，仅用于生成
-通过率报告。这样做是为了避免在 Apache-2.0 项目中再分发 LGPL-2.1 授权的文件。
+**该语料不随本仓库分发。** 脚本在运行时克隆到临时目录、用后删除，并**钉在 tag `v1.7.4`**
+（可用 `HUNSPELL_REF=` 覆盖）。钉版本有两个理由：一是让 README 里的绝对数字**可复现**
+（上游 master 前进会静默改变分母：2026-09-28 上游新增了一个 6 行的套件，
+使总数从 848 变成 854，而通过率不变）；二是避免再分发 LGPL-2.1 授权的文件。
 
 ## 词典
 
-示例中使用的词典均标注其来源与许可证，见 `examples/` 与各词典目录下的说明。
+`bench/run.sh`、`conformance/differential.sh` 与 `examples/doccheck` 都会在**运行时**把
+`en_US`（LibreOffice 的 `dictionaries` 项目，源自 SCOWL）拉到本机，**不写进本仓库**。
+三者的缓存行为并不相同，如实说明：
 
-`bench/run.sh`、`conformance/differential.sh` 与 `examples/doccheck` 都会在**运行时**
-把 `en_US`（LibreOffice `dictionaries` 项目，源自 SCOWL）拉取到**临时目录**，
-用完即删，**不写进本仓库**。SCOWL / Kevin Atkinson 的许可与部分来源的 Ispell BSD
-与 WordNet 声明见上游的 `README_en_US.txt`。
+- `bench/run.sh`、`conformance/differential.sh`：抓到 `mktemp -d` 的临时目录，**用后即删**。
+- `examples/doccheck/run.sh`：抓到 `${XDG_CACHE_HOME:-${TMPDIR:-/tmp}}/spell-doccheck-en_US`
+  并**保留缓存**（下次直接复用）。所以它是"不写进仓库"，而不是"用完即删"。
+  用 `SPELL_DICT_DIR=` 可以指向你自己的副本。
+
+SCOWL / Kevin Atkinson 的许可，以及部分来源的 Ispell BSD 与 WordNet 声明，见上游的
+`README_en_US.txt`。
+
+仓库内**唯一内嵌**的词典是 `examples/basic/main.mbt` 中为本示例现写的 8 行小词典，
+其来源在文件头注释与 `examples/README.md` 中说明；`examples/doccheck/allowlist.txt`
+是本项目自产的词表（不是 en_US 的拷贝）。
 
 ## 第三方依赖
 
-见 `moon.mod` 的 `import` 段与 `moon tree` 输出。
+| 依赖 | 用途 | 许可证 |
+|---|---|---|
+| `moonbitlang/x@0.5.5` | `env` / `fs` / `sys` / `unicode`（纯 MoonBit） | **Apache-2.0**（与其自身 `moon.mod` 的 `license` 字段一致） |
+
+本项目**未**使用 `moonbitlang/x` 中带额外许可证的子包（例如 `pyca-bcrypt`）。
+`moon.mod` 的 `import` 段与 `moon tree` 输出是依赖的权威清单。

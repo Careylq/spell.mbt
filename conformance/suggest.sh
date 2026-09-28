@@ -12,6 +12,7 @@
 # Usage:
 #   bash conformance/suggest.sh                       # clone the corpus to a temp dir
 #   HUNSPELL_DIR=/path/to/hunspell bash conformance/suggest.sh
+#   HUNSPELL_REF=v1.7.3 bash conformance/suggest.sh   # pin a different corpus release
 #   CONFORMANCE_REQUIRE_CLI=1 bash conformance/suggest.sh   # fail instead of skipping
 #
 # Exit status:
@@ -85,7 +86,10 @@ else
   TMP_CLONE="$(mktemp -d)"
   CLEANUP="$TMP_CLONE"
   echo "Cloning hunspell test corpus into $TMP_CLONE ..."
-  if ! git clone --depth 1 --quiet https://github.com/hunspell/hunspell "$TMP_CLONE/hunspell"; then
+  # Pinned; see conformance/run.sh for why.
+  CORPUS_REF="${HUNSPELL_REF:-v1.7.4}"
+  if ! git clone --depth 1 --quiet --branch "$CORPUS_REF" \
+       https://github.com/hunspell/hunspell "$TMP_CLONE/hunspell"; then
     echo "ERROR: could not clone the corpus. Set HUNSPELL_DIR to a local checkout." >&2
     exit 1
   fi

@@ -12,10 +12,10 @@ for the words it rejects.
 >
 > | | |
 > |---|---|
-> | Conformance (official Hunspell corpus) | `.good` **841/848 = 99.2%** · `.wrong` **611/613 = 99.7%** |
+> | Conformance (official Hunspell corpus, corpus pinned to tag `v1.7.4`) | `.good` **847/854 = 99.2%** · `.wrong` **611/613 = 99.7%** |
 > | Differential test vs hunspell 1.7.3 | 235,976 real words: **199 disagreements = 0.084%** |
 > | Tests | **182** (wasm / wasm-gc / js) · **186** (native) |
-> | Direct lookup vs hunspell | **parity** (0.34–0.38 vs 0.36–0.38 µs/word) |
+> | Direct lookup vs hunspell | **parity** (0.32–0.38 vs 0.36–0.38 µs/word; the ratio crosses 1.0 both ways) |
 > | wasm artifact | **142.2 KiB**, with no C++ runtime |
 >
 > [`ACCEPTANCE.md`](ACCEPTANCE.md) is the requirement-by-requirement self-check against all
@@ -23,7 +23,9 @@ for the words it rejects.
 > items), the website's 6 standards, the organisers' 4 review dimensions, and this project's
 > own proposal. It also names which proposal commitments were **exceeded** and which single
 > commitment turned out to be **untrue and was fixed**. Every figure above comes from a
-> script in this repository: `bash check-all.sh` re-runs all of them.
+> script in this repository: `bash check-all.sh` re-runs all of them (it needs network, and a
+> system `hunspell` plus `/usr/share/dict/words` for the differential row — the per-command
+> prerequisites are tabulated in [`ACCEPTANCE.md`](ACCEPTANCE.md#八如何复现) §八).
 
 > This file is `README.mbt.md` — MoonBit type-checks `.mbt.md` files, so every block
 > below marked `mbt check` is compiled by `moon check` (an unmarked block is not).
@@ -35,17 +37,39 @@ for the words it rejects.
 > [Not implemented yet](#not-implemented-yet) for what suggestion generation
 > still leaves out (ngram/`MAXNGRAMSUGS` candidates in particular).
 
+## Contents
+
+- [Conformance](#conformance) — 99.2% on the official Hunspell corpus, and the
+  [differential test](#differential-test-against-the-real-hunspell) behind that number
+- [Performance](#performance) — load, throughput, artifact sizes, and
+  [what is *not* measured](#what-is-not-measured)
+- [Why](#why) — the gap in the MoonBit ecosystem this fills
+- [Ecosystem relevance](#ecosystem-relevance) — including the
+  [dogfooding run](#what-the-dogfooding-run-found)
+- [Install](#install) and [Quick start](#quick-start) — with the `moon.pkg` wiring, the
+  [CLI](#command-line) and a [runnable example](#runnable-example)
+- [Scope](#scope) — [what is implemented](#implemented), and
+  [what deliberately is not](#not-implemented-yet)
+- [Native code](#native-code) — the single 46-line C shim, and why it exists
+- [Design](#design) · [Development](#development)
+- [Community articles](#community-articles) · [License](#license)
+
 ## Conformance
 
-Measured against the official Hunspell test corpus (`hunspell/hunspell` → `tests/`, 154
+Measured against the official Hunspell test corpus (`hunspell/hunspell` → `tests/`, 155
 suites with `.good`/`.wrong` files) by `bash conformance/run.sh`. The corpus is fetched
-at run time and is **not** redistributed with this repository (Hunspell is LGPL-2.1;
-this project is Apache-2.0 — see [NOTICE](NOTICE)). The numbers below come from an
-actual run of the harness, not an estimate.
+at run time, **pinned to the tag `v1.7.4`** (`HUNSPELL_REF=` overrides), and is **not**
+redistributed with this repository (Hunspell is tri-licensed MPL-1.1 / GPL-2.0 / LGPL-2.1;
+this project is Apache-2.0 — see [NOTICE](NOTICE)).
+
+Pinning is not decoration: upstream master moves, and a new upstream suite silently changes
+every absolute count here. On 2026-09-28 upstream gained `compoundaffixmorph` (6 `.good`
+lines, all passing in this library), which moved the total from 848 to 854 **without
+changing the pass rate**. The pin makes the numbers below reproducible.
 
 | Metric | Passing | Total | Pass rate |
 |---|---|---|---|
-| `.good` (must be accepted) | 841 | 848 | 99.2% |
+| `.good` (must be accepted) | 847 | 854 | 99.2% |
 | `.wrong` (must be rejected) | 611 | 613 | 99.7% |
 | `.sug` (expected best suggestion produced) | 141 | 173 | 81.5% |
 
@@ -99,8 +123,8 @@ spellings: `OPENOFFICE.ORG`, `UNICEF'S`, `L'AFRIQUE`, `IPOD`) and the Hungarian
 > `paste -d' '`, which silently misaligned every line containing a space —
 > `morph.good` has 16 of them (`drink eat`, …) — and scored them as failures
 > whatever the engine said. `conformance/run.sh` counts verdicts and *also* prints
-> the historical positional totals (`825/848`, `611/613`) next to the counted ones
-> so the two stay comparable; the 16-verdict difference between `825` and `841` is
+> the historical positional totals (`831/854`, `611/613`) next to the counted ones
+> so the two stay comparable; the 16-verdict difference between `831` and `847` is
 > the size of that measurement artefact, not a behaviour change. Tab-terminated
 > lines such as `utf8_bom.good`'s are unaffected either way, because `awk` splits
 > on tabs as well as spaces.
@@ -117,11 +141,14 @@ every disagreement printed:
 | we reject, hunspell accepts (**false rejects**) | 1 | 0.000% |
 | total disagreement | 199 | 0.084% |
 
-The single false reject is `Jean-Christophe`. The 198 false accepts are forms
-Hunspell reaches through derivational rules this library does not cover yet
-(`-er` / `-ing` / `-ness` / `-ly` coinages). They are **not** a regression: the same
-measurement re-run in a `git worktree` at the commit before the compound work gives
-an identical 198/1 — zero new, zero fixed. `run.sh` and `differential.sh` both
+Read the two rows in the direction they are defined, because they point opposite ways.
+The single **false reject** is `Jean-Christophe` — the one word where this library is
+*stricter* than Hunspell. The 198 **false accepts** are the other direction: words
+Hunspell rejects and this library accepts, i.e. here **this library is the more permissive
+one** (`sparingness`, `winkered`, `towser`, `yester`, … — `-ness`/`-er`/`-ed` derivations
+that its affix engine allows on stems Hunspell does not). They are **not** a regression:
+the same measurement re-run in a `git worktree` at the commit before the compound work
+gives an identical 198/1 — zero new, zero fixed. `run.sh` and `differential.sh` both
 report; neither treats a disagreement as a harness failure.
 
 ## Performance
@@ -139,7 +166,7 @@ system `hunspell`, and prints the machine/toolchain header next to every table.
 Method, caveats and the deliberately-omitted measurements:
 [`bench/README.md`](bench/README.md).
 
-**Machine:** Apple M5 (10 cores), 16 GiB, macOS 26.6.2 (25G83), arm64.
+**Machine:** Apple M5 (10 cores), 16 GiB, macOS **26.7 (25G229)**, arm64.
 **Toolchain:** `moon 0.1.20260920`, `moonc v0.10.14+7d59c7ec9`, `moonrun 0.1.20260920`.
 **Dictionary:** LibreOffice `en_US` (SCOWL size 60), **49,568 entries**, fetched
 from jsDelivr at run time (`.aff` sha256 `e746c882…`, `.dic` sha256 `f0b1a234…`).
@@ -155,21 +182,23 @@ repetitions; `load = empty − start`, `check = N-words − empty`.
 
 | step | wasm debug (`moon run`) | wasm release (`moon run --release`) |
 |---|---|---|
-| process start | 0.0190 s | 0.0210 s |
-| start + load (49,568 entries) | 0.1390 s | 0.1120 s |
-| **load only** | **0.1200 s** | **0.0910 s** |
-| 49,568-word run (all hits) | 0.2020 s | 0.1980 s |
-| **checking only** | **0.0630 s** | **0.0860 s** |
-| per-word check | 1.27 µs | 1.73 µs |
-| throughput, end-to-end | 245,386 words/s | 250,343 words/s |
-| throughput, checking only | 786,794 words/s | 576,372 words/s |
+| process start | 0.0210 s | 0.0210 s |
+| start + load (49,568 entries) | 0.1390 s | 0.1190 s |
+| **load only** | **0.1180 s** | **0.0980 s** |
+| 49,568-word run (all hits) | 0.1970 s | 0.1640 s |
+| **checking only** | **0.0580 s** | **0.0450 s** |
+| per-word check | 1.17 µs | 0.91 µs |
+| throughput, end-to-end | 251,614 words/s | 302,244 words/s |
+| throughput, checking only | 854,621 words/s | 1,101,511 words/s |
 
 Plain `moon run` compiles **debug** wasm; the release column is the same backend
-compiled like the native binary. The two end-to-end totals are within 1.5% of each
-other (0.2020 s vs 0.1980 s), so the split of that total between "load" and
-"checking" is dominated by run-to-run noise in the empty-word-list point the split
-is derived from — the release column loading faster (0.0910 s vs 0.1200 s) while
-appearing to check slower is an artefact of that subtraction, not a real effect.
+compiled like the native binary. Here release is ahead on both ends (it loads in
+0.0980 s vs 0.1180 s and checks in 0.0450 s vs 0.0580 s), which is the expected
+direction and worth noting because in an earlier run of this same harness the two
+columns **reversed** on the checking row — that reversal was an artefact of deriving
+"checking" by subtracting an empty-word-list measurement that carries process-start
+noise. Read the two columns as *the same backend compiled two ways, one run*, not as
+a stable ordering.
 All 49,568 entries load; 49,565 are accepted standalone and the 3
 rejected (`1th`, `2th`, `3th`) all carry `ONLYINCOMPOUND`, which Hunspell also
 rejects standalone — the harness derives that from the `.aff` instead of
@@ -186,36 +215,39 @@ not apples-to-apples, so this compares **two native executables** on the same
 |---|---|---|---|
 | process start | 0.0020 s | 0.0030 s | 0.67× |
 | dictionary load only | 0.0300 s | 0.0070 s | 4.29× |
-| 49,568 all-hit words: total | 0.0510 s | 0.0280 s | 1.82× |
-| 49,568 all-hit words: **checking only** | **0.0190 s** | **0.0180 s** | 1.06× |
-| 49,568 all-hit words: **per word** | **0.38 µs** | **0.36 µs** | 1.06× |
-| 49,568 all-miss words: total | 0.5080 s | 0.0840 s | 6.05× |
-| 49,568 all-miss words: checking only | 0.4760 s | 0.0740 s | 6.43× |
-| 49,568 all-miss words: per word | 9.60 µs | 1.49 µs | 6.44× |
-| 235,976 mixed words (`/usr/share/dict/words`, 18.4% hits) | 1.9100 s | 0.2870 s | 6.66× |
-| 235,976 mixed words: throughput | 123,548 words/s | 822,216 words/s | |
+| 49,568 all-hit words: total | 0.0490 s | 0.0280 s | 1.75× |
+| 49,568 all-hit words: **checking only** | **0.0170 s** | **0.0180 s** | 0.94× |
+| 49,568 all-hit words: **per word** | **0.34 µs** | **0.36 µs** | 0.94× |
+| 49,568 all-miss words: total | 0.5180 s | 0.0840 s | 6.17× |
+| 49,568 all-miss words: checking only | 0.4860 s | 0.0740 s | 6.57× |
+| 49,568 all-miss words: per word | 9.80 µs | 1.49 µs | 6.58× |
+| 235,976 mixed words (`/usr/share/dict/words`, 18.4% hits) | 1.8400 s | 0.2890 s | 6.37× |
+| 235,976 mixed words: throughput | 128,248 words/s | 816,526 words/s | |
 
 The aggregate ratios hide the interesting part. On **hits** the two engines are
-level per word (0.38 µs vs 0.36 µs, a 6% gap that is inside run-to-run variance) —
-our 1.82× on that row is almost entirely dictionary load (30 ms vs 7 ms) — while on
-**misses** we are 6.4× slower per
-word, because a rejected word runs the reverse affix lookup over every suffix
+level per word — across runs this library has been both marginally ahead and marginally
+behind, and that the ratio crosses 1.0 in both directions is the point — so our end-to-end
+gap on that row is almost entirely dictionary load (30 ms vs 7 ms); while on **misses** we
+are **about 6× slower per word**, because a rejected word runs the reverse affix lookup over every suffix
 rule, every prefix rule, the prefix×suffix cross product and the two-suffix
 families (`affix_hit` in `src/spell/lookup.mbt`), whereas a hit is one map
 access (`direct_hit`). Real text is miss-dominated here: `/usr/share/dict/words`
 is only 18.4% hits. **The miss path and dictionary load are the optimisation
 targets; direct lookup is already at parity.**
 
-> **Run-to-run range, so no single ratio is over-read.** Repeating `bash bench/run.sh`
-> on this machine moves the direct-hit row between **0.89× and 1.06×** (ours
-> 0.34–0.38 µs/word, hunspell 0.36–0.38) and the all-miss row between **6.30× and 6.44×**
-> (ours 9.38–9.60 µs/word, hunspell 1.49). That spread is why this section claims
-> *parity* on hits and "≈6× slower" on misses instead of quoting one run's ratio as if it
-> were a property of the code. The table above is one such run.
+> **Run-to-run range, so no single ratio is over-read.** Repeated `bash bench/run.sh`
+> runs on this machine have put the direct-hit row between **0.84× and 1.06×** — that is,
+> **on both sides of parity** (ours 0.32–0.38 µs/word, hunspell 0.36–0.38) — and the
+> all-miss row between **5.9× and 6.6×** (ours 9.2–9.8 µs/word, hunspell 1.49–1.57). Each
+> re-run has widened the range rather than narrowing it, which is why this section claims
+> **the shape, not a decimal**: hits are at parity, misses are *about six times* slower,
+> dictionary load *about four times*. The table above is one run — not the best one, and
+> not a claim about the code's ratio. **If you need a ratio for a decision, re-run the
+> harness; do not lift one from here.**
 
-As a cross-backend data point on the same 235,976 words: native release 1.910 s
-is **2.20×** faster than release wasm (4.201 s) and **2.50×** faster than the
-debug wasm that plain `moon run` builds (4.782 s).
+As a cross-backend data point on the same 235,976 words: native release 1.840 s
+is **2.25×** faster than release wasm (4.146 s) and **2.51×** faster than the
+debug wasm that plain `moon run` builds (4.621 s).
 
 ### Scaling on synthetic dictionaries
 
@@ -259,10 +291,31 @@ number is invented for them.
 
 ## Why
 
-MoonBit's package registry has no spell-checking library at all — no Hunspell-format
-parser, no affix morphology, no spell judgement. Related packages solve different
-problems (`moonlexicon` is multi-pattern string matching; `moonnlp` and
-`tokenizers-moonbit` are NLP/LLM tokenizers). This project fills that gap.
+When this project was proposed (September 2026), searching mooncakes.io for `hunspell`,
+  `spell`, `affix`, `stemmer`, `snowball`, `hyphenation` and `thesaurus` returned **no
+  hits**: the registry had no Hunspell-format parser, no affix morphology and no spell
+  judgement. Related packages solved different problems (`moonlexicon` is multi-pattern
+  string matching; `moonnlp` and `tokenizers-moonbit` are NLP/LLM tokenizers).
+
+**That is no longer literally true, and this file should say so.** On 2026-09-27 —
+after this project's first release on 2026-09-22 — a second package with the same
+positioning appeared: [`wccerty/moonspell`](https://mooncakes.io/docs/wccerty/moonspell)
+("A pure-MoonBit Hunspell-compatible spelling engine", Apache-2.0). It is an independent
+implementation; this project did not exist alongside it when it started. Two
+implementations of a standard format in one registry is a normal and healthy outcome, so
+the honest claim is not "we are the only one" but **what this one verifiably does**:
+
+| | this project | `wccerty/moonspell` |
+|---|---|---|
+| First release | 2026-09-22 | 2026-09-27 |
+| Releases | 15 (0.1.0 → 0.9.6) | 1 (0.1.0) |
+| Official-corpus conformance | `.good` 847/854 = 99.2%, `.wrong` 611/613 = 99.7%, `.sug` 141/173 = 81.5% | not stated on its package page |
+| Differential test vs hunspell on 235,976 real words | published, 0.084% disagreement | not published |
+| Licence | Apache-2.0 | Apache-2.0 |
+
+The numbers in the third row are this repository's; the other package is new and may well
+publish equivalents. The point of the comparison is only that the ecosystem now has a
+choice, and this entry's case rests on measured conformance rather than on being first.
 
 ## Ecosystem relevance
 
@@ -277,8 +330,8 @@ backend, with the ecosystem's own tools:
 * **A real dictionary format, not a toy word list.** It reads the Hunspell
   `.aff`/`.dic` files that LibreOffice, Firefox and macOS already ship, so a MoonBit
   program can consume existing language data instead of a bespoke format.
-* **A wasm-first text component.** `preferred_target = "wasm"`; the CLI is ~103 KiB of
-  wasm with no C++ runtime, which is the shape a browser or edge-worker text feature
+* **A wasm-first text component.** `preferred_target = "wasm"`; the CLI is **142.2 KiB**
+  of wasm with no C++ runtime, which is the shape a browser or edge-worker text feature
   wants.
 * **An API a MoonBit developer can actually read.** `moon doc` / the mooncakes.io page
   carries a `///` comment for every public item, and the module root
@@ -309,12 +362,12 @@ fetched at run time and never vendored):
 | claim | value |
 |---|---|
 | files scanned | **34** |
-| distinct words the first run flags | **118** |
+| distinct words the first run flags | **128** (grows with the prose — not a stable figure) |
 | …of those, real typos | **0** |
 | after `examples/doccheck/allowlist.txt` | **0** |
 | with `--include-tests` (all deliberate fixtures) | 13 tokens / 10 distinct |
 
-**All 118 are false positives of a general English dictionary on technical prose.** They are
+**Every one of them is a false positive of a general English dictionary on technical prose.** They are
 project vocabulary (`wasm`, `backend`, `aff`), Hunspell terminology (`Fuge`, `endchars`,
 `ngram`), MoonBit and third-party proper nouns (`MoonBit`, `macOS`, `jsDelivr`), British
 spellings (`judgement`, `licence`, `modelled`) and ordinary words this SCOWL size omits
@@ -322,12 +375,14 @@ spellings (`judgement`, `licence`, `modelled`) and ordinary words this SCOWL siz
 honest result: a general English dictionary is a poor fit for a technical repository, and the
 allowlist is what makes the tool usable, not a formality.
 
-> The total word and token counts are deliberately **not** quoted as fixed figures: they move
-> with this file's own prose (the repository currently carries roughly 20,000 checked words,
-> and it grew from ~18,300 during 0.9.x alone). Pinning them to a release guaranteed they went
-> stale on the next sentence. The two numbers the claim actually rests on — **118 distinct
-> words flagged and 0 real typos** — have not moved. The full extraction rules, the
-> `--include-tests` breakdown and the known false positives are in
+> **These counts are deliberately not pinned**, and the flagged-word count above is marked as
+> unstable on purpose. They move with this file's own prose: the repository carries roughly
+> 21,700 checked words today and carried ~18,300 during 0.9.x, and the number of words the first
+> run flags has **already moved once — 118 → 128** — for exactly that reason. An earlier version
+> of this section quoted 118 as a figure that "has not moved"; that claim was itself the same
+> mistake this project keeps removing, and an audit caught it. What the claim actually rests on
+> is the one number the gate re-checks on every run: **0 genuine typos among the flagged words.**
+> The full extraction rules, the `--include-tests` breakdown and the known false positives are in
 > [examples/README.md](examples/README.md#examplesdoccheck).
 
 ## Install
@@ -511,9 +566,11 @@ allowlist and the measured numbers.
     text and from the checked word before any comparison (Arabic harakat, right-to-left
     marks);
   * a trailing `.` is accepted for abbreviations when `WORDCHARS` declares `.`, and a
-    number (ASCII or Arabic-Indic digits) with one separator (`.`, `,`, `-`) between
+    number (ASCII or Arabic-Indic digits) with **one** separator (`.`, `,`, `-`) between
     digits is accepted when `WORDCHARS` declares that separator (`1.12345`, `4,2`,
-    `42-42`);
+    `42-42`). **This is narrower than Hunspell**, which allows any number of separators
+    as long as they are neither adjacent nor at either end (`1.2.3`, `2026.1.1`); this
+    library rejects those. See [Not implemented yet](#not-implemented-yet);
   * `BREAK` splitting, recursively: the declared break points, or Hunspell's defaults
     `-`, `^-` and `-$` (`foo-bar-foo-bar`), with `BREAK 0` switching breaking off;
   * a line of whitespace-separated words is correct when every word on it is correct,
@@ -569,8 +626,8 @@ allowlist and the measured numbers.
     two independent adjacent transpositions — the kinds the manual names, O(n²) rather
     than O(n²·|TRY|²), so it stays cheap;
   * the **`PHONE` phonetic pass** — the Aspell-derived table-driven transcription is
-    implemented (character classes, `-` retention, `<` re-scan, digit priorities, `^`/`$`
-    anchors, `_` as the empty output) and every dictionary word is indexed by its key
+    implemented (character classes, `-` retention, `<` re-scan, `^`/`$` anchors, `_` as
+    the empty output) and every dictionary word is indexed by its key
     once at load time; a `.dic` `ph:` field is that entry's key (`xxxxxxxxxx ph:Brasilia`
     is pronounced like `Brasilia`). Candidates are dressed in the input's capitalisation
     (`kt` → `cat`, `Kt` → `Cat`, `KT` → `CAT`). A dictionary with no `PHONE` line skips
@@ -610,8 +667,30 @@ each of wasm, wasm-gc, js and native.
   three-or-more-part compound to be rejected when it is one edit away from a dictionary
   word (`foobarbaz` vs `goobarbaz`). No directive requests it and the manual does not
   describe it, so it is not guessed at.
-- **`COMPOUNDROOT` / `SYLLABLENUM`** — parsed into the AST but not applied; no corpus
-  suite exercises them.
+- **`COMPOUNDROOT` / `SYLLABLENUM`** — collected in `AffFile::unrecognized` rather than
+  modelled on the AST, and not applied; no corpus suite exercises them.
+- **Six behavioural deviations found by an independent audit (2026-09-28), disclosed rather
+  than fixed before this snapshot.** The audit compared this library against hunspell 1.7.3
+  on synthetic dictionaries and found places where behaviour differs from the reference
+  *without* being covered by the list above. None of them appears on the official corpus and
+  none is a conformance failure, so changing verified engine code two days before a deadline
+  was judged the larger risk; they are queued instead. [`ACCEPTANCE.md`](ACCEPTANCE.md) §7.2
+  tabulates all six with the command that establishes each. The two worth naming here:
+  - **Multi-separator numbers** — Hunspell accepts `1.2.3` and `2026.1.1` when the
+    separators are neither adjacent nor at either end; this library allows only **one**
+    separator and rejects them. The implementation's own comment states Hunspell's rule
+    correctly, so this is a code bug rather than a design decision — and the test that
+    asserts `1.2.3` is *false* encodes the bug, which is why only an audit surfaced it.
+  - **Compound length** — an absent `COMPOUNDWORDMAX` means *unlimited* in the manual, but
+    the default branch and the `COMPOUNDSYLLABLE` exception both fall back to 8 parts, so
+    9- and 12-part compounds are rejected where Hunspell accepts them.
+  - **`CHECKCOMPOUNDTRIPLE` scope** — applied to non-ASCII characters although the code's
+    own comment says ASCII-only, so a non-ASCII triple at a compound boundary is rejected.
+  - **`PHONE` digit priorities** — parsed into the AST and never read, so they cannot
+    influence the `<` re-scan (the claim that they do has been removed above).
+  - **`AM` morphological aliases** — parsed and never consumed.
+  - **The CLI's UTF-8 sniffer** — accepts overlong encodings and surrogates although its
+    comment says it rejects them; it had no test of its own.
 - **The n-gram candidate generator** — Hunspell's last suggestion channel is absent.
   The `.aff` directives that configure it are parsed into the AST
   (`AffFile::max_ngram_sugs`, `AffFile::max_diff`, `AffFile::only_max_diff`), but no

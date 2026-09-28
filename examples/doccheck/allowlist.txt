@@ -110,6 +110,8 @@ parenthesised
 neighbour
 neighbours
 neighbouring
+behavioural
+organised
 organisers
 honoured
 tokenisation
@@ -120,6 +122,11 @@ whitespace
 # --- proper nouns --------------------------------------------------------
 macOS
 jsDelivr
+arXiv
+McEval
+LLMs
+Giagnorio
+Bavota
 
 # --- ordinary English words a size-60 SCOWL list omits -------------------
 # `artefact` and `normalisation` are the British spellings used by this
@@ -131,6 +138,13 @@ artefact
 derivational
 misaligns
 misclassifies
+codebase
 misconfiguration
 normalisation
 tokenizers
+tradeoff
+tradeoffs
+underspecified
+tri
+unreproducible
+verifiably

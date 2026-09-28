@@ -1,7 +1,8 @@
 // Blackbox tests for the public `@dic.parse_dic` API.
 //
-// Every dictionary snippet here is written from scratch; no test data from the
-// Hunspell repository is copied.
+// Every dictionary snippet here is written from scratch. An audit of all fixtures in
+// this repository found no upstream line overlap in this file; overlap does exist in
+// others — see NOTICE, "关于测试夹具", for the audit and its judgement.
 
 ///|
 /// Run `parse_dic` and normalize its outcome so a test can assert on either

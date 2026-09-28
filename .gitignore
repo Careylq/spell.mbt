@@ -7,3 +7,12 @@ target
 
 # reports from check-all.sh (regenerated on every run)
 .final-check/
+
+# Safety net: corpora and dictionaries are fetched at run time and must never be
+# committed. The scripts put them in temp dirs, but SPELL_DICT_DIR=. or
+# HUNSPELL_DIR=$PWD/x would land them here.
+*.aff
+*.dic
+*.good
+*.wrong
+*.sug

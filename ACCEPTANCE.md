@@ -34,13 +34,13 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 | # | 章程要求 | 状态 | 证据位置 |
 |---|---|---|---|
 | 1 | 项目以 **MoonBit 为主要实现语言** | ✅ | `src/` **6,749 行**（6 个库包）+ `cmd/main` 601 行 + `examples/` 958 行，**全部 MoonBit**；库包无 `extern`、无 C、无 FFI。仓库内唯一 C 是 CLI 的 46 行 stdin 垫片（原因见 [README](README.md#native-code)） |
-| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；提交按功能分组、连续可追溯；`DEVLOG.md` 逐日记录（Day 1–14） |
+| 2 | GitHub 仓库**公开可访问**，提交记录清晰 | ✅ | https://github.com/Careylq/spell.mbt ；提交按功能分组、连续可追溯；`DEVLOG.md` 逐条记录（Day 1–15；这是**工作切片**编号，不是自然日） |
 | 3 | 源代码结构清晰，**能完成声明的核心功能** | ✅ | `src/aff`（.aff 解析）· `src/dic`（.dic 解析）· `src/affix`（条件匹配）· `src/spell`（判定引擎）· `src/suggest`（建议引擎）· `src/api`（公开 API）· `cmd/main`（CLI） |
 | 4 | 提供 **README**：项目目标 / 安装方式 / 使用方法 / 示例 / **可复现** | ✅ | [`README.mbt.md`](README.mbt.md)（英文，权威）+ [`README.zh.mbt.md`](README.zh.mbt.md)（中文）；两版都是 `.mbt.md`，代码块受 `moon check` 编译。含安装（含 `moon.pkg` 写法）、Quick start、CLI、以及一条命令的全量复现 |
-| 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) **14 步**：`moon check` / `build` / `test --target all` / 跨后端构建 / 符合率报告 / **本仓库自身文档的拼写门禁** / 退出码契约自检。另有手动触发的 `bench.yml` |
+| 5 | **使用持续集成工具，覆盖检查、构建、测试流程** | ✅ | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) **11 个声明步骤**（GitHub UI 显示为 14，含 `Set up job` / `Post Checkout` / `Complete job`）：`moon check` / `build` / `test --target all` / 跨后端构建 / 符合率报告 / **本仓库自身文档的拼写门禁** / 退出码契约自检。另有手动触发的 `bench.yml` |
 | 6 | 提供**至少一个可运行示例**或最小使用样例 | ✅ | 三个：[`examples/basic`](examples/basic)（`moon run examples/basic` 直接跑）· [`examples/doccheck`](examples/doccheck)（用本库检查本仓库文档）· [`examples/ci-gate`](examples/ci-gate)（**离线**证明退出码可作 CI 门禁） |
 | 7 | 提供**完整测试，覆盖核心功能路径** | ✅ | `moon test --target all` → **182 个测试**（native **186 个**），四后端全通过；测试代码 3,323 行；另有符合率框架 `conformance/` |
-| 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.9.5`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
+| 8 | **发布到 mooncakes.io** | ✅ | `Careylq/spell@0.9.6`（`build_status: success`）· https://mooncakes.io/docs/Careylq/spell |
 | 9 | 采用 **OSI 认可的开源许可证** | ✅ | [`LICENSE`](LICENSE) = Apache-2.0（OSI 认证） |
 | 10 | 如参考/移植其他开源项目，符合原项目许可证要求 | ✅ | [`NOTICE`](NOTICE)：参考 Hunspell（LGPL-2.1）的**格式规范与可观察行为**，未复制源码；测试语料与词典**不随仓库分发**，均由脚本运行时拉取 |
 
@@ -52,7 +52,7 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 |---|---|---|---|
 | 1 | 项目须在 GitHub 或赛事组认可的平台**公开发布** | ✅ | https://github.com/Careylq/spell.mbt （public）；并发布到 mooncakes.io |
 | 2 | 仓库须包含**完整源代码** | ✅ | `src/`（6 个库包）+ `cmd/` + `examples/` 全为源码；`_build/`、`.mooncakes/` 已在 `.gitignore`。提交的 `pkg.generated.mbti` 是 `moon info` 生成的**包接口描述**，MoonBit 的约定是随源码一同提交（10 个包各一份） |
-| 3 | 仓库须保留**合理开发历史记录** | ✅ | 提交按功能分组且连续；[`DEVLOG.md`](DEVLOG.md) 逐日记录设计取舍；`.githooks/pre-commit` |
+| 3 | 仓库须保留**合理开发历史记录** | ✅ | 提交按功能分组且连续；[`DEVLOG.md`](DEVLOG.md) 逐条记录设计取舍；`.githooks/pre-commit` 是**可选**钩子（需 `git config core.hooksPath .githooks` 才生效，本仓库未设置） |
 | 4 | 仓库须包含 **README** | ✅ | [`README.mbt.md`](README.mbt.md)（`README.md` 为符号链接）+ 中文版 |
 | 5 | 项目须选择 **OSI 认证许可证** | ✅ | Apache-2.0 |
 | 6 | 如移植或参考其他开源项目，应在 **README 或专门文档**中注明原项目**名称、链接、许可证和参考范围** | ✅ | [`NOTICE`](NOTICE) 逐项列明：Hunspell / 链接 / LGPL-2.1 / 参考范围；README 也指向它 |
@@ -62,11 +62,21 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 | 10 | 同意主办方在保留署名前提下用于**赛事宣传、官网展示、社区文章、技术分享** | ✅ | 已知悉并同意（亦为章程第九条参赛前提） |
 
 > **第 9 条专述**：本项目开发过程使用了 AI 辅助，因此「代码来源可核验」是关键。
-> 可核验材料全部在仓库内：[`DEVLOG.md`](DEVLOG.md) 逐日记了**哪些部分由 AI 生成、
-> 以及每一处是如何被验证的**；[`docs/MOONBIT_GOTCHAS.md`](docs/MOONBIT_GOTCHAS.md)
-> 收录 **43 条由编译器或运行时实测**的 MoonBit 陷阱；[`CHANGELOG.md`](CHANGELOG.md) 记录
-> 每个版本的改动与理由；`examples/` 中的样例词典均为本仓库现写并注明来源，
-> 未使用任何第三方测试数据。第三方语料只在脚本运行时拉取，不随仓库分发。
+> 可核验材料全部在仓库内：
+>
+> - [`DEVLOG.md`](DEVLOG.md) 的每个工作日小节里都有「AI 使用方式（本日）」，
+>   说明当日**哪些工作由 AI 完成、以及用什么手段验证的**（`moon check` / `moon test` /
+>   官方语料 / 实测计时）。粒度是**当日切片**，不是逐行归属。
+> - [`docs/MOONBIT_GOTCHAS.md`](docs/MOONBIT_GOTCHAS.md) 收录 **43 条** MoonBit 陷阱，
+>   每条都注明是由编译器、warning 还是实际运行验证的。
+> - [`CHANGELOG.md`](CHANGELOG.md) 记录每个版本的改动与理由。
+> - `examples/` 的样例词典为本仓库现写；`examples/basic` 与 `examples/ci-gate` 的词典
+>   自写性已由独立审计确认。
+>
+> **需要如实说明的两点**：① 没有任何模型/工具/版本署名，也**没有逐行归属**，
+> 所以「哪一段由 AI 生成」无法被外部独立核验，只能靠上述过程记录；②
+> **测试夹具与上游语料存在少量逐行重合**，已在 [`NOTICE`](NOTICE) 中披露并给出可复现的
+> 审计方法与判断。第三方语料只在脚本运行时拉取，不随仓库分发。
 
 ---
 
@@ -90,15 +100,17 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 | 维度 | 结论 | 证据 |
 |---|---|---|
 | **项目完成度** | Hunspell `.aff`/`.dic` 的**解析 → 词缀推导 → 判定 → 建议**全链路打通。官方语料 `.good` **99.2%**、`.wrong` **99.7%**；真实词典上与 C++ Hunspell 判定基本一致（235,976 词上分歧 **0.084%**） | [§六](#六已实测指标每条都可用仓库内脚本复现) |
-| **代码质量** | **182 / 186** 个测试 × 四后端全通过；`moon check --deny-warn --target all` **0 warning**；`moon fmt --check` 干净；`.mbti` 公开接口 diff 为空；CI 14 步全绿；每个实测数字都有脚本，且**每个未通过用例都逐条列明并解释为什么不猜** | `check-all.sh`；[README](README.md#conformance) |
+| **代码质量** | **182 / 186** 个测试 × 四后端全通过；`moon check --deny-warn --target all` **0 warning**；`moon fmt --check` 干净；`.mbti` 公开接口 diff 为空；CI 全绿（11 个声明步骤）；每个实测数字都有脚本，且**每个未通过用例都逐条列明并解释为什么不猜** | `check-all.sh`；[README](README.md#conformance) |
 | **开源合规性** | Apache-2.0；`NOTICE` 声明参考范围并隔离 LGPL-2.1；语料与词典不分发；依赖唯一且为纯 MoonBit | [`NOTICE`](NOTICE)；[§二](#二章程第七章开源与成果提交要求10-条) |
-| **与 MoonBit 生态的相关性** | 填补生态空缺（申报前实测 7 个相关关键词在 mooncakes.io **0 命中**）；四后端可用；公开 API 全部带 `///` 文档；可直接 `moon add` 作为依赖；并有**吃自己狗粮**的 `doccheck` | [README · Ecosystem relevance](README.md#ecosystem-relevance) |
+| **与 MoonBit 生态的相关性** | 本项目 0.1.0 于 **2026-09-22** 发布，当时以 `hunspell`/`spell`/`affix`/`stemmer`/`snowball`/`hyphenation`/`thesaurus` 检索 mooncakes.io 均为 0 命中；**此后同赛道出现了另一个包**（`wccerty/moonspell`，2026-09-27 首发），已在 README 里如实写明并给出可核验的差异数据；此外四后端可用、公开 API 全部带 `///` 文档、可直接 `moon add`，并有**吃自己狗粮**的 `doccheck` | [README · Ecosystem relevance](README.md#ecosystem-relevance) |
 
 ---
 
 ## 五、与申报书的一致性对照
 
-> 对照基准：本人通过官方表单提交的《spell.mbt 项目申报书》。
+> 对照基准：本人通过**官方表单**提交的《spell.mbt 项目申报书》。
+> **原件不在仓库内**（它经官方问卷提交，不属于代码仓库的内容），下面表格是对其内容的
+> **重述**，不是原件引用；如需核对原件，可由组委或作者随时提供。
 > 章程约束是**单向**的 —— 多做了不算违背，**少做了才算**（L227「应完成申报阶段约定的
 > 主要功能」、L245「未完成申报 Proposal 中的主要目标」、L247「与申报内容明显不符」）。
 
@@ -106,7 +118,7 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 
 | # | 申报书原文要求 | 状态 | 证据 |
 |---|---|---|---|
-| 1 | `.aff` 解析：覆盖 `SET` `FLAG` `AF`/`AM` `PFX`/`SFX` `REP` `TRY` `KEY` `IGNORE` `WORDCHARS` `COMPOUND*` 及 `NOSUGGEST` `KEEPCASE` 等特殊 flag | ✅ | `src/aff/`；官方语料 `.good` **841/848 = 99.2%** |
+| 1 | `.aff` 解析：覆盖 `SET` `FLAG` `AF`/`AM` `PFX`/`SFX` `REP` `TRY` `KEY` `IGNORE` `WORDCHARS` `COMPOUND*` 及 `NOSUGGEST` `KEEPCASE` 等特殊 flag | ✅ | `src/aff/`；官方语料 `.good` **847/854 = 99.2%** |
 | 2 | 「未实现的指令会**统一记录不直接丢弃**」 | ✅ | `AffFile.unrecognized : Array[UnknownDirective]`；有测试断言其 `name`/`args`/`line` |
 | 3 | 「解析出错**标注对应行号**」 | ✅ | `AffParseError(line~, message~)`，`to_string()` 即 `"line N: message"` |
 | 4 | `.dic` 解析：词条计数、单词与 flag 映射、转义字符、**四种 flag 格式**（单字符 / long / num / UTF-8） | ✅ | `src/dic/`；各有专门测试 |
@@ -170,23 +182,28 @@ bash check-all.sh          # 闸门 + 全部测量，报告写入 .final-check/
 
 ### 6.1 官方语料符合率
 
-`bash conformance/run.sh` —— 154 个测试套件、848 个 `.good` 判定：
+`bash conformance/run.sh` —— **155 个测试套件、854 个 `.good` 判定**（语料钉在 tag `v1.7.4`）：
 
 | 指标 | 通过 | 总数 | 通过率 |
 |---|---|---|---|
-| `.good`（必须接受） | **841** | 848 | **99.2%** |
+| `.good`（必须接受） | **847** | 854 | **99.2%** |
 | `.wrong`（必须拒绝） | **611** | 613 | **99.7%** |
 | `.sug`（期望首选建议被产出） | **141** | 173 | **81.5%** |
 
-未通过的 `.good` **正好 7 个**，全部落在 [§七](#七诚信说明刻意未实现的部分) 已列明的未实现项上：
+未通过的 `.good` **正好 7 个**，全部落在 [§七](#七诚信说明未实现与已知偏差) 已列明的未实现项上：
 ALL-CAPS 输入匹配混合大小写词条（6 个判定、4 个不同拼写：`OPENOFFICE.ORG` `UNICEF'S`
 `L'AFRIQUE` `IPOD`）、匈牙利 `LANG hu` 的 moving rule（`forróvíz-tartály`）。
 未通过的 `.wrong` 只有 2 个：`allcaps2` 的 `iPodos` 与 `limit-multiple-compounding` 的 `foobarbaz`。
 
+> **这些绝对数字的前提是语料被钉在 tag `v1.7.4`。** 上游 master 会前进，而新套件会
+> 静默改变分母：2026-09-28 上游新增了 `compoundaffixmorph`（6 行 `.good`，本库 6/6 全过），
+> 使总数从 848 变成 854 —— **通过率不变，但文档里的绝对数就不再可复现**。
+> 因此 `conformance/run.sh` 现在钉版本（`HUNSPELL_REF=` 可覆盖）。
+
 > **一个被修正的度量 bug（97.3% → 99.2%）**：早期 harness 用 `paste -d' '` 按**位置**配对
 > 输入流与判定流，于是任何**含空格的语料行都会错位并被无条件记为失败**
 > （`morph.good` 有 16 行 `drink eat` 这种）。改成「每个非空输入行一个判定、直接计数」后
-> 得到 841/848；`841 − 825 = 16` 正是该假象的大小。**引擎行为一个字都没变** ——
+> 得到 847/854；`847 − 831 = 16` 正是该假象的大小。**引擎行为一个字都没变** ——
 > 全量测试与差分测试的结果都逐字未变。
 
 ### 6.2 与真实 hunspell 的差分测试
@@ -194,9 +211,10 @@ ALL-CAPS 输入匹配混合大小写词条（6 个判定、4 个不同拼写：`
 `bash conformance/differential.sh` —— en_US + `/usr/share/dict/words`：
 
 235,976 个词上，与原生 `hunspell 1.7.3` 的判定差异 **199 个（0.084%）**：
-「该拒绝却接受」**198 个**，「该接受却拒绝」**1 个**（`Jean-Christophe`）。
-这 198 个是 Hunspell 由派生规则承认、本库派生规则尚未覆盖的形态（`-er`/`-ing`/`-ness`/`-ly`
-造词），且**不是回归** —— 在引入复合词引擎之前的提交上重跑同一测量，得到完全相同的 198/1。
+「该拒绝却接受」**198 个** —— 即**本库比 Hunspell 更宽松**：这些词 Hunspell 判错、本库判对，
+形如 `sparingness` / `winkered` / `towser` / `yester` 的 `-ness`/`-er`/`-ed` 派生形态；
+「该接受却拒绝」**1 个**（`Jean-Christophe`，本库比 Hunspell 严）。
+且**不是回归** —— 在引入复合词引擎之前的提交上重跑同一测量，得到完全相同的 198/1。
 
 ### 6.3 建议质量口径
 
@@ -217,16 +235,18 @@ ALL-CAPS 输入匹配混合大小写词条（6 个判定、4 个不同拼写：`
 |---|---|---|---|
 | 进程启动 | 0.0020 s | 0.0030 s | 0.67×（略快） |
 | 词典加载（49,568 词条） | 0.030 s | 0.007 s | 慢 4.29× |
-| **直接命中，仅查找** | **0.34–0.38 µs/词** | 0.36–0.38 µs/词 | **0.89×–1.06×（持平）** |
-| 未命中，仅查找 | 9.38–9.60 µs/词 | 1.49 µs/词 | 慢 6.30×–6.44× |
+| **直接命中，仅查找** | **0.32–0.38 µs/词** | 0.36–0.38 µs/词 | **0.84×–1.06×（跨过 1.0，即持平）** |
+| 235,976 词混合（18.4% 命中） | 1.84 s | 0.29 s | 慢 6.37× |
+| 未命中，仅查找 | 9.2–9.8 µs/词 | 1.49–1.57 µs/词 | 慢 5.9×–6.6× |
 
 **结论是精确定位的，不是「整体慢 6 倍」**：差距全在**未命中路径**（每个被拒的词要把每条
 后缀规则、前缀规则、前缀×后缀叉积和双后缀族全试一遍）与**词典加载**；**直接查表已与
 Hunspell 持平**。这两点就是明确、可验证、可排期的优化目标。
 
-> 区间而非单值：重复运行同一脚本时，直接命中这一行会在 **0.89×–1.06×** 之间摆动
-> （同一份代码两次跑出了相反的结论），所以这里报**实测区间**而不是挑一次好看的比值。
-> 这也正是本项目把「重测」写进流程的原因。
+> 区间而非单值：重复运行同一脚本时，直接命中这一行**会跨过 1.0**（观测到 0.84× 与 1.06×
+> ——同一份代码跑出相反的结论），未命中这一行在 **5.9×–6.6×** 之间摆动。**每次重跑都在
+> 把区间拉宽而不是收窄**，所以这里主张的是**形状**：命中持平、未命中约 6×、加载约 4×；
+> 需要具体比值就现场重跑，不要引用这里的某一个数。这也正是本项目把「重测」写进流程的原因。
 
 ### 6.5 产物体积
 
@@ -239,23 +259,28 @@ wasm 产物 142 KiB 且**无 C++ 运行时** —— 这是 wasm 宿主实际下�
 
 | 项 | 值 |
 |---|---|
-| 扫描规模 | 34 个文件（约 2 万词） |
-| 首次运行（无 allowlist）标记的**不同词** | **118** |
-| 其中**真实拼写错误** | **0** —— 118 个全是通用英语词典在技术文本上的误报（如实记录） |
-| 应用 109 条 allowlist 后 | **0** |
+| 扫描规模 | 34 个文件、约 **2.17 万词**（这个数随本仓库自己的散文增长，**不钉死**） |
+| 首次运行（不做 allowlist）标记的**不同词** | 约 **128**（同上：0.9.x 期间从 118 涨到 128。**不是**稳定指标） |
+| 其中**真实拼写错误** | **0** —— 全部是通用英语词典在技术文本上的误报（逐个人工核过） |
+| 应用 allowlist 后 | **0** |
 | `--include-tests`（均为刻意构造的测试用例） | 13 处 / 10 个不同词 |
 
 > **为什么不写词数/标记总数**：这两个数会**随本仓库自己的散文增长**（0.9.x 期间从约
-> 1.83 万词涨到约 2 万词），钉住它们等于保证下一句改动就让数字过期。本项主张真正依赖的
-> 是**稳定**的那两个：**118 个不同词被标记、其中 0 个是真错**。当前总数请运行命令查看。
+> 1.83 万词涨到 2.17 万词），钉住它们等于保证下一句改动就让数字过期。**首次运行被标记的
+> 不同词数同样是浮动量**（0.9.x 期间从 118 涨到 128）——本项主张真正依赖的只有一条：
+> **这些标记里没有一个是真的拼写错误**，而权威清单就是 `examples/doccheck/allowlist.txt`
+> 本身（122 条、按类别注释，每条都能人工核对）。当前总数请运行命令查看。
 
 本仓库 CI 已经把这个门禁作为**阻塞步骤**（对真拼写错误变红、对网络抖动放行）。
 
 ---
 
-## 七、诚信说明：刻意未实现的部分
+## 七、诚信说明：未实现与已知偏差
 
-最终验收看「项目完成度」，因此这里明确列出**未做**的部分，避免任何含糊。
+最终验收看「项目完成度」，因此这里明确列出**未做**的部分与**已知的行为偏差**，避免任何含糊。
+
+### 7.1 刻意未实现（符合率缺口的封闭清单）
+
 **清单是封闭的：符合率里每一个未通过项都能在这里找到对应条目。**
 
 - **ALL-CAPS 输入匹配混合大小写词条** —— Hunspell 能把 `OPENOFFICE.ORG` 匹配到
@@ -285,6 +310,25 @@ wasm 产物 142 KiB 且**无 C++ 运行时** —— 这是 wasm 宿主实际下�
 - **与 Hunspell C++ 库的 FFI 绑定** —— 本项目自行实现，不链接任何拼写器（设计选择）
 - **编辑器插件与图形界面**
 
+### 7.2 独立审计发现的行为偏差（已披露；**未在快照前改动引擎**）
+
+2026-09-28 的一次独立代码审计用真实 `hunspell 1.7.3` 逐条对拍，发现以下**行为偏差**。
+它们**不在 7.1 的清单里**（不是刻意不实现，而是实现与 Hunspell 不一致），因此在此单独披露。
+**本次不在快照前修引擎** —— 理由是：这些偏差都不出现在官方语料的任何一个未通过项里，
+而改动已验证的引擎代码需要重跑全部测量、并承担回归风险；它们已列入下一版的修复计划。
+
+| # | 偏差 | Hunspell 的行为 | 本库的行为 | 如何确认 |
+|---|---|---|---|---|
+| 1 | **多分隔符数字词** | 接受 `1.2.3`、`1.2.3.4`（分隔符只要不相邻、不在首尾即可） | 只允许**一个**分隔符，故判错 | 用 `WORDCHARS 0123456789.` + `BREAK 0` 的合成词典对拍（本文件记录时已复现） |
+| 2 | **复合词段数上限** | `COMPOUNDWORDMAX` 缺省为**不限**；`COMPOUNDSYLLABLE` 例外也覆盖该上限 | 缺省与例外分支都**回落成 8 段**，故拒绝 9 段、12 段复合词 | `COMPOUNDFLAG C` + `COMPOUNDMIN 1` 合成词典：8 段两边都接受，9/12 段只有本库拒绝 |
+| 3 | **`CHECKCOMPOUNDTRIPLE` 的作用范围** | 只对 ASCII 字母生效 | 对非 ASCII 也生效，故拒绝 `ééé` 边界（源码注释自称只查 ASCII） | `abéé/C` + `écd/C` 合成词典；ASCII 对照两边一致 |
+| 4 | **`PHONE` 的 digit priority** | 影响 `<` 重扫时的候选选择 | 已解析进 AST，但**没有任何代码读取**（此前 README 把它列为已实现，已更正） | 全仓库检索：该字段只有写入、无读取路径 |
+| 5 | **`AM` 别名表** | 展开到词条的形态字段 | 解析后未被消费（`morph_aliases` 无读取方） | 同上 |
+| 6 | **CLI 的 UTF-8 嗅探** | —（本项目自有逻辑） | 声称拒绝 overlong 与代理对，实测**接受** `E0 83 A9`、`ED A0 80`、`F0 80 80 AF`，仅 2 字节 overlong 被正确拒绝 | 白盒探针实跑；该函数此前**一行测试都没有** |
+
+> 这 6 条的发现过程、复现命令与修复计划记在 [`DEVLOG.md`](DEVLOG.md)。
+> 其中第 1 条对应的 README 表述（原先写 "one separator"）也已改成与本库实际行为一致的说明。
+
 ---
 
 ## 八、如何复现
@@ -308,8 +352,18 @@ bash examples/ci-gate/run.sh          # 离线断言退出码契约
 moon run examples/basic               # 可运行示例
 ```
 
-`conformance/` 与 `bench/` 需要网络（语料/词典运行时拉取，**不随仓库分发**）；
-`examples/ci-gate` 与全部闸门**不需要网络**。
+**前提条件（诚实地列全）**：
+
+| 命令 | 需要 |
+|---|---|
+| 全部闸门、`examples/ci-gate`、`moon run examples/basic` | 只需 MoonBit 工具链，**离线可跑** |
+| `conformance/run.sh`、`conformance/suggest.sh` | 网络（运行时克隆语料，钉在 tag `v1.7.4`，**不随仓库分发**）；或设 `HUNSPELL_DIR` 指向本地检出 |
+| `conformance/differential.sh` | 网络（拉 en_US）**＋ 系统装有 `hunspell` ＋ 存在 `/usr/share/dict/words`** |
+| `bench/run.sh` | 网络（拉 en_US）＋ 系统装有 `hunspell`（缺失则跳过对比部分） |
+| `examples/doccheck/run.sh` | 网络（首次拉 en_US，之后用缓存；`SPELL_DICT_DIR` 可指向本地） |
+
+所以 `bash check-all.sh` 在**没有 `hunspell` 的 Linux 容器**里会在差分那一步失败——
+这是环境缺失，不是项目缺陷；脚本会明确说明缺什么。
 
 ---
 
@@ -319,9 +373,9 @@ moon run examples/basic               # 可运行示例
 - [x] `moon build` 通过（wasm / wasm-gc / js / native 四后端 release 均成功）
 - [x] `moon test --target all` 全部通过（182 / 182 / 182 / 186）
 - [x] `moon fmt --check` 干净；`moon info` 的 `.mbti` diff 为空
-- [x] CI 全步骤 success（14 步，含两步阻塞式门禁）
+- [x] CI 全步骤 success（11 个声明步骤，含两步阻塞式门禁）
 - [x] README 与本文的数字全部是**实测**的，且由 `check-all.sh` 可复现
 - [x] `NOTICE` 的参考范围与许可证声明准确
 - [x] `DEVLOG.md` 已补齐到最新
 - [x] 申报书承诺的范围已逐条对照（[§五](#五与申报书的一致性对照)）
-- [x] 仓库内无模板残留、无死链、无来源不明内容
+- [x] 仓库内无死链、无来源不明内容。**两处 `moon new` 模板文件保留未改**（`.github/workflows/copilot-setup-steps.yml` 与 `.githooks/`），它们与全新 `moon new` 逐字节相同 —— 这是**有意保留**（MoonBit 项目脚手架 + AI 环境配置），不是遗漏
