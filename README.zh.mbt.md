@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml/badge.svg)](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml)
 
-**中文**（本文件）· [**English**](README.md) —— 英文版是**权威版本**：完整实测表格、
+**中文**（本文件）· [**English**](README.mbt.md) —— 英文版是**权威版本**：完整实测表格、
 逐条未实现清单与全部可复现命令以它为准。
 
 纯 MoonBit 实现的拼写检查库，兼容 **Hunspell 的 `.aff` / `.dic` 词典格式**：
@@ -14,8 +14,10 @@
 > 性能方法与坑位记录都在那里。本文件覆盖同样的结论与关键数字，但**若两者有出入，
 > 以英文版和产出这些数字的脚本为准**。
 >
-> `README.zh.md` 是本文件的符号链接（GitHub 要能正常渲染）。两个版本都是 `.mbt.md`，
-> 所以**其中的 MoonBit 代码块都会被 `moon check` 编译**，不会腐烂。
+> 两个版本都是 `.mbt.md`，所以**其中的 MoonBit 代码块都会被 `moon check` 编译**，不会腐烂。
+> （仓库根目录的 `README.md` 是指向 `README.mbt.md` 的符号链接 —— GitHub 只有在渲染
+> *仓库首页* 时才会解引用它；所以**两份 README 之间的切换链接一律指向真实文件名**，
+> 而不是那个符号链接。）
 
 > **评委速览。** 本仓库就是提交内容 —— 验收读的是 git 快照，所以需要的一切都在仓库里：
 >

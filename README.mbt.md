@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml/badge.svg)](https://github.com/Careylq/spell.mbt/actions/workflows/ci.yml)
 
-**English** (this file) · [**中文**](README.zh.md) — 中文说明是精简版；完整表格、逐条未实现清单与
+**English** (this file) · [**中文**](README.zh.mbt.md) — 中文说明是精简版；完整表格、逐条未实现清单与
 可复现命令以本文件为准。
 
 A pure-MoonBit spell checker compatible with the **Hunspell `.aff` / `.dic` dictionary
@@ -814,9 +814,12 @@ The examples are [`examples/basic`](examples/basic) (runnable end to end),
 non-zero when it finds a typo) and [`examples/ci-gate`](examples/ci-gate) (proves that exit
 status gates a build, offline).
 
-A Chinese companion README lives at [`README.zh.md`](README.zh.md). It is a `.mbt.md` file
-too, so its code blocks are compiled and its examples executed — the Chinese documentation
-cannot drift away from the code.
+A Chinese companion README lives at [`README.zh.mbt.md`](README.zh.mbt.md). It is a
+`.mbt.md` file too, so its code blocks are compiled and its examples executed — the Chinese
+documentation cannot drift away from the code. (Both READMEs are linked directly by their
+real filenames rather than through the `.md` symlink: GitHub resolves a symlinked README for
+the *repository front page*, but browsing a symlink file itself shows its target path rather
+than the content.)
 
 ## Community articles
 
