@@ -304,25 +304,31 @@ numbers). [`examples/ci-gate`](examples/ci-gate) verifies the contract offline, 
 repository's own CI gates on it.
 
 Measured on this repository (`moon 0.1.20260920`, en_US from LibreOffice/SCOWL size 60,
-fetched at run time and never vendored). The word count depends on how much prose the
-repository carries, so these figures are a **snapshot of the 0.9.6 tree**; re-running the
-command prints the current numbers:
+fetched at run time and never vendored):
 
-| run | words checked | misspelled tokens | distinct words |
-|---|---|---|---|
-| first run, no allowlist | 20,287 | 616 | 118 |
-| with `examples/doccheck/allowlist.txt` | 20,287 | 0 | 0 |
+| claim | value |
+|---|---|
+| files scanned | **34** |
+| distinct words the first run flags | **118** |
+| …of those, real typos | **0** |
+| after `examples/doccheck/allowlist.txt` | **0** |
+| with `--include-tests` (all deliberate fixtures) | 13 tokens / 10 distinct |
 
-**Of the 118 distinct words the first run flagged, 0 were real typos and 118 were false
-positives.** They are project vocabulary (`wasm`, `backend`, `aff`), Hunspell
-terminology (`Fuge`, `endchars`, `ngram`), MoonBit and third-party proper nouns
-(`MoonBit`, `macOS`, `jsDelivr`), British spellings (`judgement`, `licence`, `modelled`)
-and ordinary words this SCOWL size omits (`seekable`, `matcher`, `substring`). All of
-them are now in the allowlist. That is the honest result: a general English dictionary
-is a poor fit for a technical repository, and the allowlist is what makes the tool
-usable, not a formality. The full rules, the `--include-tests` numbers
-(14 tokens, 11 distinct, all deliberate fixtures) and the known false positives are in
-[examples/README.md](examples/README.md#examplesdoccheck).
+**All 118 are false positives of a general English dictionary on technical prose.** They are
+project vocabulary (`wasm`, `backend`, `aff`), Hunspell terminology (`Fuge`, `endchars`,
+`ngram`), MoonBit and third-party proper nouns (`MoonBit`, `macOS`, `jsDelivr`), British
+spellings (`judgement`, `licence`, `modelled`) and ordinary words this SCOWL size omits
+(`seekable`, `matcher`, `substring`). All of them are now in the allowlist. That is the
+honest result: a general English dictionary is a poor fit for a technical repository, and the
+allowlist is what makes the tool usable, not a formality.
+
+> The total word and token counts are deliberately **not** quoted as fixed figures: they move
+> with this file's own prose (the repository currently carries roughly 20,000 checked words,
+> and it grew from ~18,300 during 0.9.x alone). Pinning them to a release guaranteed they went
+> stale on the next sentence. The two numbers the claim actually rests on — **118 distinct
+> words flagged and 0 real typos** — have not moved. The full extraction rules, the
+> `--include-tests` breakdown and the known false positives are in
+> [examples/README.md](examples/README.md#examplesdoccheck).
 
 ## Install
 
