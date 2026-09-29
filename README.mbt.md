@@ -249,15 +249,23 @@ access (`direct_hit`). Real text is miss-dominated here: `/usr/share/dict/words`
 is only 18.4% hits. **The miss path and dictionary load are the optimisation
 targets; direct lookup is already at parity.**
 
-> **Run-to-run range, so no single ratio is over-read.** Repeated `bash bench/run.sh`
-> runs on this machine have put the direct-hit row between **0.80× and 1.06×** — that is,
-> **on both sides of parity** (ours 0.32–0.38 µs/word, hunspell 0.36–0.40) — the all-miss
-> row between **5.9× and 6.6×** (ours 9.2–9.8 µs/word, hunspell 1.49–1.57), and dictionary
-> load between **4× and 5×**. **Every re-run so far has widened these ranges rather than
-> narrowing them**, which is why this section claims **the shape, not a decimal**: hits are
-> at parity, misses are *about six times* slower, load *four to five times*. The table
-> above is one run — not the best one, and not a claim about the code's ratio. **If you
-> need a ratio for a decision, re-run the harness; do not lift one from here.**
+> **Read the ratios, not the microseconds.** Absolute times move with machine load. One
+> run of this harness during the final check took **~1.9× longer for *both* engines**
+> (0.65 vs 0.34 µs/word for ours, 0.71 vs 0.36 for hunspell) — the machine was busy, not
+> the code — while the *ratio* stayed where it always is. So the claim here is the ratio,
+> and the ratio across runs is what has been stable:
+>
+> | row | ratio observed across runs | reading |
+> |---|---|---|
+> | 49,568 all-hit words, per word | **0.80× – 1.06×** | **parity**, on both sides of 1.0 |
+> | 49,568 all-miss words, per word | **5.9× – 6.6×** | about six times slower |
+> | dictionary load only | **4× – 5×** | four to five times slower |
+>
+> **Every re-run so far has widened these ratios rather than narrowing them**, which is why
+> this section claims **the shape, not a decimal**: hits are at parity, misses are *about
+> six times* slower, load *four to five times*. The table above is one run — not the best
+> one, and not a claim about the code's ratio. **If you need a ratio for a decision, re-run
+> the harness; do not lift one from here.**
 
 As a cross-backend data point on the same 235,976 words: native release 1.840 s
 is **2.25×** faster than release wasm (4.146 s) and **2.51×** faster than the
