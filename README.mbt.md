@@ -15,6 +15,7 @@ for the words it rejects.
 >
 > | | |
 > |---|---|
+> | **Declared scope** | **all seven core features in the proposal are delivered**, and two of the four items the proposal listed as "not planned for this round" were delivered as well — every deliberate omission is listed rather than left silent ([Scope](#scope), [`ACCEPTANCE.md`](ACCEPTANCE.md) §5) |
 > | Conformance (official Hunspell corpus, corpus pinned to tag `v1.7.4`) | `.good` **847/854 = 99.2%** · `.wrong` **611/613 = 99.7%** |
 > | Differential test vs hunspell 1.7.3 | 235,976 real words: **199 disagreements = 0.084%** |
 > | Tests | **206** (wasm / wasm-gc / js) · **210** (native) |
